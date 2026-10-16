@@ -1,4 +1,3 @@
-
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -22,9 +21,27 @@ app.get("/api/health", (req, res) => {
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/donations", donationRoutes);
 
+async function connectDB() {
+  const primaryUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/donation";
+  const localUri = "mongodb://127.0.0.1:27017/donation";
+
+  try {
+    await mongoose.connect(primaryUri, { serverSelectionTimeoutMS: 4000 });
+    console.log("Connected to MongoDB successfully");
+  } catch (error) {
+    if (primaryUri !== localUri) {
+      console.warn(`Could not connect to MongoDB URI (${error.message}). Trying local MongoDB fallback...`);
+      await mongoose.connect(localUri, { serverSelectionTimeoutMS: 4000 });
+      console.log("Connected to local MongoDB (mongodb://127.0.0.1:27017/donation) successfully");
+    } else {
+      throw error;
+    }
+  }
+}
+
 async function startServer() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    await connectDB();
 
     // Add sample campaigns only when the database is empty
     if ((await Campaign.countDocuments()) === 0) {
