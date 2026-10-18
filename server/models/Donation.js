@@ -30,6 +30,12 @@ const donationSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
+    razorpayOrderId: {
+      type: String,
+    },
+    paymentId: {
+      type: String,
+    },
     status: {
       type: String,
       enum: ["demo", "pending", "successful", "failed"],

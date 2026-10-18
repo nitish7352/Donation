@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Heart, ArrowRight } from "lucide-react";
 import "./index.css";
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fallbackImages = [
   "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=800",
@@ -11,8 +11,38 @@ const fallbackImages = [
   "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800"
 ];
 
+const initialCampaigns = [
+  {
+    _id: "demo-1",
+    title: "Education for Every Child",
+    description: "Support school supplies, books and learning opportunities.",
+    category: "Education",
+    targetAmount: 100000,
+    collectedAmount: 25000,
+    image: fallbackImages[0]
+  },
+  {
+    _id: "demo-2",
+    title: "Food for Needy Families",
+    description: "Help provide essential meals to families in need.",
+    category: "Food",
+    targetAmount: 50000,
+    collectedAmount: 18000,
+    image: fallbackImages[1]
+  },
+  {
+    _id: "demo-3",
+    title: "Medical Care for Everyone",
+    description: "Help people access essential medical care and supplies.",
+    category: "Healthcare",
+    targetAmount: 150000,
+    collectedAmount: 60000,
+    image: fallbackImages[2]
+  }
+];
+
 function App() {
-  const [campaigns, setCampaigns] = useState([]);
+  const [campaigns, setCampaigns] = useState(initialCampaigns);
   const [selected, setSelected] = useState(null);
   const [donations, setDonations] = useState([]);
   const [form, setForm] = useState({
@@ -53,14 +83,44 @@ function App() {
     setPage("donate");
   }
 
-  async function submitDonation(e) {
-    e.preventDefault();
+  async function submitDonation(e, mode = "razorpay") {
+    if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
     setNotice("");
     setError("");
 
+    if (mode === "demo") {
+      try {
+        const response = await fetch(`${API}/donations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campaignId: selected._id,
+            ...form
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message);
+
+        setNotice("Demo donation recorded! No real payment was charged.");
+        setForm({ donorName: "", email: "", amount: "500", message: "" });
+        await loadData();
+      } catch (err) {
+        setError(err.message || "Donation could not be recorded.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Razorpay flow
     try {
-      const response = await fetch(`${API}/donations`, {
+      if (typeof window.Razorpay === "undefined") {
+        throw new Error("Razorpay SDK is loading. Please check your internet connection or try again.");
+      }
+
+      const orderRes = await fetch(`${API}/donations/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -69,21 +129,71 @@ function App() {
         })
       });
 
-      const data = await response.json();
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) {
+        throw new Error(orderData.message || "Failed to create Razorpay order.");
+      }
 
-      if (!response.ok) throw new Error(data.message);
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency || "INR",
+        name: "HelpHands Donation",
+        description: `Contribution for ${selected.title}`,
+        order_id: orderData.orderId,
+        handler: async function (response) {
+          try {
+            setLoading(true);
+            const verifyRes = await fetch(`${API}/donations/verify`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                donationId: orderData.donationId,
+              })
+            });
 
-      setNotice("Demo donation recorded! No real money was transferred.");
-      setForm({
-        donorName: "",
-        email: "",
-        amount: "500",
-        message: ""
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) {
+              throw new Error(verifyData.message || "Payment verification failed.");
+            }
+
+            setNotice(
+              `Payment successful! Thank you for donating ₹${Number(form.amount).toLocaleString("en-IN")}. Payment ID: ${response.razorpay_payment_id}`
+            );
+            setForm({ donorName: "", email: "", amount: "500", message: "" });
+            await loadData();
+          } catch (vErr) {
+            setError(vErr.message || "Payment verification failed.");
+          } finally {
+            setLoading(false);
+          }
+        },
+        prefill: {
+          name: form.donorName,
+          email: form.email,
+        },
+        theme: {
+          color: "#246b49",
+        },
+        modal: {
+          ondismiss: function () {
+            setLoading(false);
+            setNotice("Payment was cancelled or closed.");
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on("payment.failed", function (resp) {
+        setError(`Payment failed: ${resp.error?.description || "Transaction declined"}`);
+        setLoading(false);
       });
-      await loadData();
+      rzp.open();
     } catch (err) {
-      setError(err.message || "Donation could not be recorded.");
-    } finally {
+      setError(err.message || "Unable to initiate Razorpay payment.");
       setLoading(false);
     }
   }
@@ -208,16 +318,15 @@ function App() {
             ← Back to campaigns
           </button>
 
-          <form className="form-card" onSubmit={submitDonation}>
-            <span className="eyebrow">Demo donation</span>
+          <form className="form-card" onSubmit={(e) => submitDonation(e, "razorpay")}>
+            <span className="eyebrow">Make a Contribution</span>
             <h2>Support {selected.title}</h2>
             <p className="muted">
-              This is a college-project simulation. No real payment
-              will be taken.
+              Choose to pay securely via Razorpay (UPI, Cards, NetBanking) or test with simulated demo donation.
             </p>
 
             {notice && <div className="notice">{notice}</div>}
-            {error && <div className="notice">{error}</div>}
+            {error && <div className="notice" style={{ background: "#fde8e8", color: "#9b1c1c" }}>{error}</div>}
 
             <label htmlFor="donorName">Your name</label>
             <input id="donorName" required maxLength="100"
@@ -248,9 +357,19 @@ function App() {
                 ...form, message: e.target.value
               })} />
 
-            <button className="btn" disabled={loading}>
-              {loading ? "Submitting..." : "Record demo donation"}
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "20px" }}>
+              <button type="submit" className="btn" disabled={loading}>
+                {loading ? "Processing..." : `Pay ₹${Number(form.amount || 0).toLocaleString("en-IN")} via Razorpay`}
+              </button>
+              <button
+                type="button"
+                className="btn btn-light"
+                disabled={loading}
+                onClick={(e) => submitDonation(e, "demo")}
+              >
+                Simulate Demo Donation (No Payment Gateway)
+              </button>
+            </div>
           </form>
         </main>
       )}

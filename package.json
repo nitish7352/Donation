@@ -1,0 +1,13 @@
+{
+  "name": "donation-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HelpHands Donation Platform monorepo",
+  "scripts": {
+    "build": "npm run build --prefix donation-website",
+    "dev": "npm run dev --prefix donation-website",
+    "install:frontend": "npm install --prefix donation-website",
+    "install:server": "npm install --prefix server",
+    "start": "npm run start --prefix server"
+  }
+}
