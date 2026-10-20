@@ -189,4 +189,14 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Clear previous history
+router.delete("/clear-all", async (req, res) => {
+  try {
+    await Donation.deleteMany({});
+    res.json({ message: "Previous donation history has been removed." });
+  } catch (err) {
+    res.status(500).json({ message: "Unable to clear donation history" });
+  }
+});
+
 export default router;

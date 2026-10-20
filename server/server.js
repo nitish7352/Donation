@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 
 import campaignRoutes from "./routes/campaigns.js";
 import donationRoutes from "./routes/donations.js";
+import contactRoutes from "./routes/contacts.js";
 import Campaign from "./models/Campaign.js";
 
 dotenv.config();
@@ -15,11 +16,12 @@ app.use(cors());
 app.use(express.json({ limit: "100kb" }));
 
 app.get("/api/health", (req, res) => {
-  res.json({ message: "HelpHands API is running" });
+  res.json({ message: "HelpHands API is running", status: "healthy" });
 });
 
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/donations", donationRoutes);
+app.use("/api/contacts", contactRoutes);
 
 async function connectDB() {
   const primaryUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/donation";
@@ -40,6 +42,7 @@ async function connectDB() {
 }
 
 async function startServer() {
+  const port = process.env.PORT || 5000;
   try {
     await connectDB();
 
@@ -69,19 +72,40 @@ async function startServer() {
           category: "Healthcare",
           targetAmount: 150000,
           collectedAmount: 60000
+        },
+        {
+          title: "Marriage Support for Poor Girls",
+          description:
+            "Help underprivileged families organize marriages with dignity by funding wedding essentials, clothing, and ceremonies.",
+          category: "Social Welfare",
+          targetAmount: 80000,
+          collectedAmount: 32000,
+          image: "https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=800"
         }
       ]);
     }
 
-    const port = process.env.PORT || 5000;
-
-    app.listen(port, () => {
-      console.log(`HelpHands API running on port ${port}`);
-    });
+    // Ensure the marriage campaign is created if DB was already seeded
+    const marriageExists = await Campaign.findOne({ title: { $regex: /marriage/i } });
+    if (!marriageExists) {
+      await Campaign.create({
+        title: "Marriage Support for Poor Girls",
+        description:
+          "Help underprivileged families organize marriages with dignity by funding wedding essentials, clothing, and ceremonies.",
+        category: "Social Welfare",
+        targetAmount: 80000,
+        collectedAmount: 32000,
+        image: "https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=800"
+      });
+      console.log("Added 'Marriage Support for Poor Girls' campaign to database.");
+    }
   } catch (error) {
-    console.error("Server startup failed:", error.message);
-    process.exit(1);
+    console.warn("MongoDB connection notice:", error.message);
   }
+
+  app.listen(port, () => {
+    console.log(`HelpHands API running on port ${port}`);
+  });
 }
 
 startServer();

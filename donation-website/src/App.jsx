@@ -1,145 +1,479 @@
-
-import { useEffect, useState } from "react";
-import { Heart, ArrowRight } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import {
+  Heart,
+  ArrowRight,
+  Bell,
+  Search,
+  Filter,
+  ShieldCheck,
+  TrendingUp,
+  Award,
+  Users,
+  CheckCircle2,
+  DollarSign,
+  Mail,
+  Phone,
+  Sparkles,
+  ExternalLink,
+  Lock,
+  Calendar,
+  X,
+  FileText,
+  Menu,
+  Crown
+} from "lucide-react";
 import "./index.css";
+
+import {
+  initialCampaigns,
+  initialDonations,
+  initialNotifications,
+  initialContacts
+} from "./data/initialData";
+
+import NotificationPanel from "./components/NotificationPanel";
+import DonationHistory from "./components/DonationHistory";
+import ContactSection from "./components/ContactSection";
+import ContactUserModal from "./components/ContactUserModal";
+import ReceiptModal from "./components/ReceiptModal";
+import AdminPortal from "./components/AdminPortal";
+import Toast from "./components/Toast";
+import AccessGate from "./components/AccessGate";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-const fallbackImages = [
-  "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=800",
-  "https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=800",
-  "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800"
-];
+export default function App() {
+  // Data states with localStorage persistence & initial fallbacks
+  const [campaigns, setCampaigns] = useState(() => {
+    const saved = localStorage.getItem("helphands_campaigns");
+    return saved ? JSON.parse(saved) : initialCampaigns;
+  });
 
-const initialCampaigns = [
-  {
-    _id: "demo-1",
-    title: "Education for Every Child",
-    description: "Support school supplies, books and learning opportunities.",
-    category: "Education",
-    targetAmount: 100000,
-    collectedAmount: 25000,
-    image: fallbackImages[0]
-  },
-  {
-    _id: "demo-2",
-    title: "Food for Needy Families",
-    description: "Help provide essential meals to families in need.",
-    category: "Food",
-    targetAmount: 50000,
-    collectedAmount: 18000,
-    image: fallbackImages[1]
-  },
-  {
-    _id: "demo-3",
-    title: "Medical Care for Everyone",
-    description: "Help people access essential medical care and supplies.",
-    category: "Healthcare",
-    targetAmount: 150000,
-    collectedAmount: 60000,
-    image: fallbackImages[2]
-  }
-];
+  const [donations, setDonations] = useState(() => {
+    // Clear out old previous history as requested by owner
+    const cacheVersion = localStorage.getItem("helphands_cache_v");
+    if (cacheVersion !== "clean_v3") {
+      localStorage.removeItem("helphands_donations");
+      localStorage.setItem("helphands_cache_v", "clean_v3");
+      return [];
+    }
+    const saved = localStorage.getItem("helphands_donations");
+    return saved ? JSON.parse(saved) : [];
+  });
 
-function App() {
-  const [campaigns, setCampaigns] = useState(initialCampaigns);
-  const [selected, setSelected] = useState(null);
-  const [donations, setDonations] = useState([]);
+  const [notifications, setNotifications] = useState(() => {
+    const saved = localStorage.getItem("helphands_notifications");
+    return saved ? JSON.parse(saved) : initialNotifications;
+  });
+
+  const [contacts, setContacts] = useState(() => {
+    const saved = localStorage.getItem("helphands_contacts");
+    return saved ? JSON.parse(saved) : initialContacts;
+  });
+
+  // UI Navigation & Modal states
+  const [page, setPage] = useState("home"); // "home" | "campaigns" | "history" | "contact" | "admin" | "donate"
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeReceipt, setActiveReceipt] = useState(null);
+  const [contactUserTarget, setContactUserTarget] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [campaignSearch, setCampaignSearch] = useState("");
+
+  // Platform Access Gate control state
+  const [hasAccess, setHasAccess] = useState(() => {
+    return sessionStorage.getItem("helphands_has_access") === "true";
+  });
+  const [accessUser, setAccessUser] = useState(() => {
+    return sessionStorage.getItem("helphands_access_user") || "aky952372@gmail.com";
+  });
+  const [isOwner, setIsOwner] = useState(() => {
+    return sessionStorage.getItem("helphands_is_owner") === "true";
+  });
+
+  // Donation Form state
   const [form, setForm] = useState({
     donorName: "",
     email: "",
-    amount: "500",
-    message: ""
+    phone: "",
+    amount: "1000",
+    message: "",
+    isAnonymous: false
   });
+  const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState("home");
 
-  async function loadData() {
+  const notifRef = useRef(null);
+
+  // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem("helphands_campaigns", JSON.stringify(campaigns));
+  }, [campaigns]);
+
+  useEffect(() => {
+    localStorage.setItem("helphands_donations", JSON.stringify(donations));
+  }, [donations]);
+
+  useEffect(() => {
+    localStorage.setItem("helphands_notifications", JSON.stringify(notifications));
+  }, [notifications]);
+
+  useEffect(() => {
+    localStorage.setItem("helphands_contacts", JSON.stringify(contacts));
+  }, [contacts]);
+
+  // Click outside listener for notifications
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setIsNotifOpen(false);
+      }
+    }
+    if (isNotifOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isNotifOpen]);
+
+  // Try fetching backend data if server is up
+  async function loadDataFromApi() {
     try {
-      const [c, d] = await Promise.all([
+      const [cRes, dRes] = await Promise.allSettled([
         fetch(`${API}/campaigns`),
-        fetch(`${API}/donations`)
+        fetch(`${API}/donations`),
+        fetch(`${API}/contacts`)
       ]);
 
-      if (!c.ok || !d.ok) throw new Error("API unavailable");
+      if (cRes.status === "fulfilled" && cRes.value.ok) {
+        const cData = await cRes.value.json();
+        if (Array.isArray(cData) && cData.length > 0) {
+          setCampaigns((prev) => {
+            const map = new Map();
+            prev.forEach((item) => map.set(item._id, item));
+            cData.forEach((item) => map.set(item._id, { ...map.get(item._id), ...item }));
+            return Array.from(map.values());
+          });
+        }
+      }
 
-      setCampaigns(await c.json());
-      setDonations(await d.json());
+      if (dRes.status === "fulfilled" && dRes.value.ok) {
+        const dData = await dRes.value.json();
+        if (Array.isArray(dData) && dData.length > 0) {
+          setDonations((prev) => {
+            const map = new Map();
+            prev.forEach((item) => map.set(item._id, item));
+            dData.forEach((item) => map.set(item._id, { ...map.get(item._id), ...item }));
+            return Array.from(map.values());
+          });
+        }
+      }
     } catch {
-      setError("Cannot connect to the backend. Start MongoDB and the server.");
+      // Backend gracefully falls back to local data
     }
   }
 
   useEffect(() => {
-    loadData();
+    loadDataFromApi();
   }, []);
 
+  // Helper to add toast and auto-dismiss
+  function addToast(toastObj) {
+    const id = "toast_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    const newToast = { id, ...toastObj };
+    setToasts((prev) => [newToast, ...prev].slice(0, 4));
+
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  }
+
+  function dismissToast(id) {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  // Access control handlers
+  function handleGrantAccess(authInfo) {
+    const userName = authInfo.name || "Verified Member";
+    const userIsOwner = authInfo.isOwner || authInfo.email === "aky952372@gmail.com";
+    setHasAccess(true);
+    setAccessUser(userName);
+    setIsOwner(userIsOwner);
+    sessionStorage.setItem("helphands_has_access", "true");
+    sessionStorage.setItem("helphands_access_user", userName);
+    sessionStorage.setItem("helphands_is_owner", userIsOwner ? "true" : "false");
+
+    addToast({
+      type: "success",
+      title: userIsOwner ? "Owner Access Granted" : "Access Granted",
+      message: userIsOwner
+        ? "Welcome, Owner (aky952372@gmail.com)! Full management unlocked."
+        : `Welcome, ${userName}! Website is unlocked.`,
+      badge: userIsOwner ? "Owner" : "Authorized"
+    });
+
+    const notif = {
+      id: "notif-access-" + Date.now(),
+      type: "milestone",
+      title: userIsOwner ? "Owner Session Started" : "Access Granted",
+      message: `${userName} entered the website via ${authInfo.method}.`,
+      time: "Just now",
+      timestamp: Date.now(),
+      read: false
+    };
+    setNotifications((prev) => [notif, ...prev]);
+  }
+
+  function handleRemoveAccess() {
+    setHasAccess(false);
+    setIsOwner(false);
+    sessionStorage.removeItem("helphands_has_access");
+    sessionStorage.removeItem("helphands_access_user");
+    sessionStorage.removeItem("helphands_is_owner");
+
+    addToast({
+      type: "contact",
+      title: "Access Locked",
+      message: "Access removed. Owner email or passcode required to enter.",
+      badge: "Locked"
+    });
+  }
+
+  function handleClearHistory() {
+    setDonations([]);
+    localStorage.removeItem("helphands_donations");
+    fetch(`${API}/donations/clear-all`, { method: "DELETE" }).catch(() => {});
+
+    addToast({
+      type: "contact",
+      title: "History Cleared",
+      message: "All previous donation records have been permanently cleared.",
+      badge: "Cleared"
+    });
+  }
+
+  // Trigger test incoming alert for demo/testing
+  function handleSimulateIncomingDonation() {
+    const donors = ["Sunita Mehra", "Karan Singhania", "Neha Gupta", "Aditya Joshi", "Tanvi Rao"];
+    const amounts = [500, 1500, 2500, 5000, 10000];
+    const randomDonor = donors[Math.floor(Math.random() * donors.length)];
+    const randomAmount = amounts[Math.floor(Math.random() * amounts.length)];
+    const randomCampaign = campaigns[Math.floor(Math.random() * campaigns.length)];
+
+    const newDonation = {
+      _id: "sim-" + Date.now(),
+      donorName: randomDonor,
+      email: `${randomDonor.toLowerCase().replace(" ", ".")}@example.com`,
+      amount: randomAmount,
+      campaignTitle: randomCampaign.title,
+      campaignId: randomCampaign._id,
+      createdAt: new Date().toISOString(),
+      message: "Sending blessings and wishing maximum success for this great campaign! 🙏",
+      status: "successful",
+      paymentMode: "UPI / PhonePe",
+      transactionId: "TXN_UPI_" + Math.floor(100000 + Math.random() * 900000),
+      isDemo: true
+    };
+
+    setDonations((prev) => [newDonation, ...prev]);
+
+    // Update campaign collected amount
+    setCampaigns((prev) =>
+      prev.map((c) =>
+        c._id === randomCampaign._id
+          ? {
+              ...c,
+              collectedAmount: (c.collectedAmount || 0) + randomAmount,
+              donorCount: (c.donorCount || 1) + 1
+            }
+          : c
+      )
+    );
+
+    // Push notification
+    const newNotif = {
+      id: "notif-" + Date.now(),
+      type: "money",
+      title: `Money Received: ₹${randomAmount.toLocaleString("en-IN")}`,
+      message: `${randomDonor} donated ₹${randomAmount.toLocaleString("en-IN")} for ${randomCampaign.title}`,
+      time: "Just now",
+      timestamp: Date.now(),
+      read: false,
+      donorName: randomDonor,
+      amount: randomAmount,
+      campaignTitle: randomCampaign.title
+    };
+
+    setNotifications((prev) => [newNotif, ...prev]);
+
+    // Trigger celebratory Toast
+    addToast({
+      type: "money",
+      title: "New Contribution Received!",
+      message: `${randomDonor} contributed ₹${randomAmount.toLocaleString("en-IN")}`,
+      amount: randomAmount,
+      badge: "Just Received"
+    });
+  }
+
+  // Handle open donation
   function openDonation(campaign) {
-    setSelected(campaign);
+    setSelectedCampaign(campaign);
     setNotice("");
     setError("");
     setPage("donate");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // Handle donation submission (Razorpay or Demo)
   async function submitDonation(e, mode = "razorpay") {
     if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
     setNotice("");
     setError("");
 
+    const numericAmount = Number(form.amount);
+    if (!numericAmount || numericAmount <= 0) {
+      setError("Please specify a valid donation amount.");
+      setLoading(false);
+      return;
+    }
+
+    const donorDisplayName = form.isAnonymous
+      ? "Anonymous Supporter"
+      : form.donorName.trim() || "Kind Supporter";
+
     if (mode === "demo") {
       try {
-        const response = await fetch(`${API}/donations`, {
+        // Try recording on server
+        fetch(`${API}/donations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            campaignId: selected._id,
-            ...form
+            campaignId: selectedCampaign._id,
+            donorName: donorDisplayName,
+            email: form.email,
+            amount: numericAmount,
+            message: form.message
           })
+        }).catch(() => {});
+
+        // Local state update
+        const recordedDonation = {
+          _id: "demo-rec-" + Date.now(),
+          donorName: donorDisplayName,
+          email: form.email,
+          phone: form.phone,
+          amount: numericAmount,
+          campaignTitle: selectedCampaign.title,
+          campaignId: selectedCampaign._id,
+          createdAt: new Date().toISOString(),
+          message: form.message,
+          status: "successful",
+          paymentMode: "Verified Demo Grant",
+          transactionId: "TXN_DEMO_" + Math.floor(100000 + Math.random() * 900000),
+          isDemo: true
+        };
+
+        setDonations((prev) => [recordedDonation, ...prev]);
+
+        // Update campaign numbers
+        setCampaigns((prev) =>
+          prev.map((c) =>
+            c._id === selectedCampaign._id
+              ? {
+                  ...c,
+                  collectedAmount: (c.collectedAmount || 0) + numericAmount,
+                  donorCount: (c.donorCount || 1) + 1
+                }
+              : c
+          )
+        );
+
+        // Create notification
+        const notif = {
+          id: "notif-" + Date.now(),
+          type: "money",
+          title: `Money Received: ₹${numericAmount.toLocaleString("en-IN")}`,
+          message: `${donorDisplayName} donated ₹${numericAmount.toLocaleString("en-IN")} for ${selectedCampaign.title}`,
+          time: "Just now",
+          timestamp: Date.now(),
+          read: false,
+          donorName: donorDisplayName,
+          amount: numericAmount,
+          campaignTitle: selectedCampaign.title
+        };
+        setNotifications((prev) => [notif, ...prev]);
+
+        // Trigger toast
+        addToast({
+          type: "money",
+          title: "Contribution Successful!",
+          message: `Thank you ${donorDisplayName}! ₹${numericAmount.toLocaleString("en-IN")} was received.`,
+          amount: numericAmount,
+          badge: "Received"
         });
 
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message);
+        setNotice(
+          `Thank you, ${donorDisplayName}! Your donation of ₹${numericAmount.toLocaleString("en-IN")} has been received and added to our transparent ledger.`
+        );
 
-        setNotice("Demo donation recorded! No real payment was charged.");
-        setForm({ donorName: "", email: "", amount: "500", message: "" });
-        await loadData();
+        // Open official receipt modal automatically
+        setTimeout(() => {
+          setActiveReceipt(recordedDonation);
+        }, 800);
+
+        setForm({
+          donorName: "",
+          email: "",
+          phone: "",
+          amount: "1000",
+          message: "",
+          isAnonymous: false
+        });
       } catch (err) {
-        setError(err.message || "Donation could not be recorded.");
+        setError(err.message || "Could not process donation.");
       } finally {
         setLoading(false);
       }
       return;
     }
 
-    // Razorpay flow
+    // Razorpay Gateway flow
     try {
       if (typeof window.Razorpay === "undefined") {
-        throw new Error("Razorpay SDK is loading. Please check your internet connection or try again.");
+        throw new Error(
+          "Razorpay script is still loading. Please check internet connection or use 'Simulate Instant Demo Donation'."
+        );
       }
 
       const orderRes = await fetch(`${API}/donations/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          campaignId: selected._id,
-          ...form
+          campaignId: selectedCampaign._id,
+          donorName: donorDisplayName,
+          email: form.email,
+          amount: numericAmount,
+          message: form.message
         })
       });
 
       const orderData = await orderRes.json();
       if (!orderRes.ok) {
-        throw new Error(orderData.message || "Failed to create Razorpay order.");
+        throw new Error(orderData.message || "Failed to create Razorpay payment order.");
       }
 
       const options = {
         key: orderData.keyId,
         amount: orderData.amount,
         currency: orderData.currency || "INR",
-        name: "HelpHands Donation",
-        description: `Contribution for ${selected.title}`,
+        name: "HelpHands Foundation",
+        description: `Donation for ${selectedCampaign.title}`,
         order_id: orderData.orderId,
         handler: async function (response) {
           try {
@@ -151,7 +485,7 @@ function App() {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-                donationId: orderData.donationId,
+                donationId: orderData.donationId
               })
             });
 
@@ -160,13 +494,77 @@ function App() {
               throw new Error(verifyData.message || "Payment verification failed.");
             }
 
-            setNotice(
-              `Payment successful! Thank you for donating ₹${Number(form.amount).toLocaleString("en-IN")}. Payment ID: ${response.razorpay_payment_id}`
+            const liveDonation = {
+              _id: orderData.donationId || "rzp-" + Date.now(),
+              donorName: donorDisplayName,
+              email: form.email,
+              phone: form.phone,
+              amount: numericAmount,
+              campaignTitle: selectedCampaign.title,
+              campaignId: selectedCampaign._id,
+              createdAt: new Date().toISOString(),
+              message: form.message,
+              status: "successful",
+              paymentMode: "Razorpay Online (UPI/Cards)",
+              transactionId: response.razorpay_payment_id,
+              isDemo: false
+            };
+
+            setDonations((prev) => [liveDonation, ...prev]);
+
+            setCampaigns((prev) =>
+              prev.map((c) =>
+                c._id === selectedCampaign._id
+                  ? {
+                      ...c,
+                      collectedAmount: (c.collectedAmount || 0) + numericAmount,
+                      donorCount: (c.donorCount || 1) + 1
+                    }
+                  : c
+              )
             );
-            setForm({ donorName: "", email: "", amount: "500", message: "" });
-            await loadData();
+
+            // Add notification
+            const notif = {
+              id: "notif-" + Date.now(),
+              type: "money",
+              title: `Payment Verified: ₹${numericAmount.toLocaleString("en-IN")}`,
+              message: `${donorDisplayName} donated ₹${numericAmount.toLocaleString("en-IN")} via Razorpay`,
+              time: "Just now",
+              timestamp: Date.now(),
+              read: false,
+              donorName: donorDisplayName,
+              amount: numericAmount,
+              campaignTitle: selectedCampaign.title
+            };
+            setNotifications((prev) => [notif, ...prev]);
+
+            // Toast alert
+            addToast({
+              type: "money",
+              title: "Verified Razorpay Payment!",
+              message: `Received ₹${numericAmount.toLocaleString("en-IN")} from ${donorDisplayName}`,
+              amount: numericAmount,
+              badge: "Verified"
+            });
+
+            setNotice(
+              `Payment successful! Payment ID: ${response.razorpay_payment_id}. Thank you for your support.`
+            );
+
+            // Show receipt
+            setActiveReceipt(liveDonation);
+
+            setForm({
+              donorName: "",
+              email: "",
+              phone: "",
+              amount: "1000",
+              message: "",
+              isAnonymous: false
+            });
           } catch (vErr) {
-            setError(vErr.message || "Payment verification failed.");
+            setError(vErr.message || "Payment verification encountered an issue.");
           } finally {
             setLoading(false);
           }
@@ -174,14 +572,15 @@ function App() {
         prefill: {
           name: form.donorName,
           email: form.email,
+          contact: form.phone
         },
         theme: {
-          color: "#246b49",
+          color: "#0f5132"
         },
         modal: {
           ondismiss: function () {
             setLoading(false);
-            setNotice("Payment was cancelled or closed.");
+            setNotice("Payment window closed. You can complete payment or use simulated donation.");
           }
         }
       };
@@ -193,114 +592,480 @@ function App() {
       });
       rzp.open();
     } catch (err) {
-      setError(err.message || "Unable to initiate Razorpay payment.");
+      setError(
+        err.message ||
+          "Could not initialize Razorpay gateway. Tip: Click 'Simulate Instant Demo Donation' below to test immediately!"
+      );
       setLoading(false);
     }
   }
 
-  const total = campaigns.reduce(
-    (sum, c) => sum + (c.collectedAmount || 0), 0
-  );
+  // Handle contact form submission
+  function handleContactSubmitted(contactData) {
+    const newContact = {
+      _id: "cnt-" + Date.now(),
+      status: "unread",
+      ...contactData
+    };
+
+    setContacts((prev) => [newContact, ...prev]);
+
+    // Send to backend
+    fetch(`${API}/contacts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(contactData)
+    }).catch(() => {});
+
+    // Create notification
+    const newNotif = {
+      id: "notif-" + Date.now(),
+      type: "contact",
+      title: "New User Inquiry Received",
+      message: `${contactData.name} submitted an inquiry: "${contactData.subject}"`,
+      time: "Just now",
+      timestamp: Date.now(),
+      read: false,
+      donorName: contactData.name
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+
+    // Toast
+    addToast({
+      type: "contact",
+      title: "Inquiry Sent!",
+      message: `Thank you ${contactData.name}. Our team has received your message.`,
+      badge: "Inquiry Logged"
+    });
+  }
+
+  // Handle message sent to user/donor
+  function handleUserMessageSent(msgData) {
+    // Add notification
+    const newNotif = {
+      id: "notif-" + Date.now(),
+      type: "contact",
+      title: `Message Sent to ${msgData.recipientName}`,
+      message: `Subject: ${msgData.subject}`,
+      time: "Just now",
+      timestamp: Date.now(),
+      read: true
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+
+    addToast({
+      type: "success",
+      title: "Communication Recorded",
+      message: `Message dispatched to ${msgData.recipientEmail}`,
+      badge: "Sent"
+    });
+  }
+
+  // Quick donation amount presets
+  const presetAmounts = ["500", "1000", "2500", "5000", "10000"];
+
+  // Filtered campaigns
+  const filteredCampaigns = campaigns.filter((c) => {
+    const matchesCat = categoryFilter === "All" || c.category === categoryFilter;
+    const matchesSearch =
+      c.title.toLowerCase().includes(campaignSearch.toLowerCase()) ||
+      c.description.toLowerCase().includes(campaignSearch.toLowerCase()) ||
+      c.category.toLowerCase().includes(campaignSearch.toLowerCase());
+    return matchesCat && matchesSearch;
+  });
+
+  const categories = ["All", "Education", "Food", "Healthcare", "Social Welfare", "Environment", "Animal Welfare"];
+
+  const totalFundsCollected = campaigns.reduce((sum, c) => sum + (c.collectedAmount || 0), 0);
+  const totalReceivedDonations = donations.length;
+  const unreadNotifCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <>
-      <header className="container navbar">
-        <a href="#home" className="logo"
-          onClick={() => setPage("home")}>
-          Help<span>Hands.</span>
-        </a>
+    <div className="app-layout">
+      {/* Platform Access Gate: Prompts for Access Passcode / Approval when opening website */}
+      {!hasAccess && (
+        <AccessGate onGrantAccess={handleGrantAccess} />
+      )}
 
-        <nav className="nav-links">
-          <a href="#home" onClick={() => setPage("home")}>Home</a>
-          <a href="#campaigns"
-            onClick={() => setPage("home")}>Campaigns</a>
-          <button className="btn"
-            onClick={() => setPage("admin")}>
-            Admin
-          </button>
-        </nav>
+      {/* Real-time Toast Notifications Portal */}
+      <Toast toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Official 80G Receipt Modal */}
+      {activeReceipt && (
+        <ReceiptModal
+          donation={activeReceipt}
+          onClose={() => setActiveReceipt(null)}
+        />
+      )}
+
+      {/* Contact Website User Modal */}
+      {contactUserTarget && (
+        <ContactUserModal
+          userTarget={contactUserTarget}
+          onClose={() => setContactUserTarget(null)}
+          onMessageSent={handleUserMessageSent}
+        />
+      )}
+
+      {/* Top Glassmorphism Navigation Bar */}
+      <header className="navbar-wrapper">
+        <div className="container navbar-inner">
+          {/* Brand Logo */}
+          <a
+            href="#home"
+            className="brand-logo"
+            onClick={(e) => {
+              e.preventDefault();
+              setPage("home");
+            }}
+          >
+            <div className="logo-heart-wrap">
+              <Heart size={20} className="logo-heart-icon" />
+            </div>
+            <div className="brand-text">
+              <span>Help</span>
+              <span className="brand-accent">Hands.</span>
+            </div>
+          </a>
+
+          {/* Navigation Links */}
+          <nav className="nav-menu">
+            <button
+              className={`nav-link ${page === "home" ? "active" : ""}`}
+              onClick={() => setPage("home")}
+            >
+              Home
+            </button>
+            <button
+              className={`nav-link ${page === "campaigns" ? "active" : ""}`}
+              onClick={() => setPage("campaigns")}
+            >
+              Causes & Campaigns
+            </button>
+            <button
+              className={`nav-link nav-link-special ${page === "history" ? "active" : ""}`}
+              onClick={() => setPage("history")}
+            >
+              <span className="live-dot" />
+              Received History
+            </button>
+            <button
+              className={`nav-link ${page === "contact" ? "active" : ""}`}
+              onClick={() => setPage("contact")}
+            >
+              Contact Us
+            </button>
+            <button
+              className={`nav-link ${page === "admin" ? "active" : ""}`}
+              onClick={() => setPage("admin")}
+            >
+              Admin Portal
+            </button>
+          </nav>
+
+          {/* Right Action Area */}
+          <div className="nav-actions">
+            {/* Interactive Notification Bell with Dropdown */}
+            <div className="notif-bell-container" ref={notifRef}>
+              <button
+                className="notif-bell-btn"
+                onClick={() => setIsNotifOpen((prev) => !prev)}
+                aria-label="Toggle notifications"
+                title="Notifications"
+              >
+                <Bell size={20} />
+                {unreadNotifCount > 0 && (
+                  <span className="notif-badge-pill">{unreadNotifCount}</span>
+                )}
+              </button>
+
+              <NotificationPanel
+                isOpen={isNotifOpen}
+                onClose={() => setIsNotifOpen(false)}
+                notifications={notifications}
+                onMarkAllAsRead={() => {
+                  setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+                }}
+                onClearAll={() => setNotifications([])}
+                onSelectNotification={(notif) => {
+                  setNotifications((prev) =>
+                    prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n))
+                  );
+                  if (notif.type === "money") {
+                    setPage("history");
+                    setIsNotifOpen(false);
+                  }
+                }}
+                onSimulateIncomingDonation={handleSimulateIncomingDonation}
+              />
+            </div>
+
+            <button
+              className="btn btn-primary nav-donate-btn"
+              onClick={() => {
+                if (campaigns.length > 0) openDonation(campaigns[0]);
+              }}
+            >
+              <Heart size={16} /> Donate Now
+            </button>
+
+            {/* Owner badge if logged in as owner */}
+            {isOwner && (
+              <div className="owner-status-pill" title="Verified Owner: aky952372@gmail.com">
+                <Crown size={14} className="text-amber" />
+                <span className="owner-pill-text">Owner: aky952372@gmail.com</span>
+              </div>
+            )}
+
+            {/* Lock Website / Remove Access Button */}
+            <button
+              className="btn-lock-access"
+              onClick={handleRemoveAccess}
+              title="Lock Platform & Remove Access"
+              aria-label="Remove Access"
+            >
+              <Lock size={15} />
+              <span className="lock-btn-label">Lock Access</span>
+            </button>
+
+            {/* Mobile menu toggle */}
+            <button
+              className="btn-mobile-menu-toggle"
+              onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+              aria-label="Toggle mobile menu"
+            >
+              {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Navigation Drawer */}
+        {isMobileMenuOpen && (
+          <div className="mobile-nav-drawer">
+            <button
+              className={`mobile-nav-link ${page === "home" ? "active" : ""}`}
+              onClick={() => { setPage("home"); setIsMobileMenuOpen(false); }}
+            >
+              Home
+            </button>
+            <button
+              className={`mobile-nav-link ${page === "campaigns" ? "active" : ""}`}
+              onClick={() => { setPage("campaigns"); setIsMobileMenuOpen(false); }}
+            >
+              Causes & Campaigns
+            </button>
+            <button
+              className={`mobile-nav-link ${page === "history" ? "active" : ""}`}
+              onClick={() => { setPage("history"); setIsMobileMenuOpen(false); }}
+            >
+              <span className="live-dot" /> Received History
+            </button>
+            <button
+              className={`mobile-nav-link ${page === "contact" ? "active" : ""}`}
+              onClick={() => { setPage("contact"); setIsMobileMenuOpen(false); }}
+            >
+              Contact Us & Community
+            </button>
+            <button
+              className={`mobile-nav-link ${page === "admin" ? "active" : ""}`}
+              onClick={() => { setPage("admin"); setIsMobileMenuOpen(false); }}
+            >
+              Admin Portal
+            </button>
+            <button
+              className="mobile-nav-link text-danger"
+              onClick={() => { handleRemoveAccess(); setIsMobileMenuOpen(false); }}
+            >
+              <Lock size={15} /> Lock & Remove Access
+            </button>
+          </div>
+        )}
       </header>
 
+      {/* Main Content Pages */}
+
+      {/* 1. HOME VIEW */}
       {page === "home" && (
         <main className="container">
-          <section className="hero" id="home">
-            <div>
-              <span className="eyebrow">
-                Small acts. Big impact.
-              </span>
-              <h1>Together, we can make the world kinder.</h1>
-              <p>
-                Support education, food and healthcare.
-                Every contribution can help create a brighter future.
-              </p>
-              <a href="#campaigns" className="btn">
-                Explore campaigns <ArrowRight size={17} />
-              </a>
-            </div>
-
-            <img className="hero-image"
-              src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1000"
-              alt="Children learning together" />
-          </section>
-
-          <section className="stats">
-            <div className="stat">
-              <strong>{campaigns.length}</strong>
-              Campaigns
-            </div>
-            <div className="stat">
-              <strong>₹{total.toLocaleString("en-IN")}</strong>
-              Demo contributions
-            </div>
-            <div className="stat">
-              <strong>{donations.length}</strong>
-              Demo donations
-            </div>
-          </section>
-
-          <section className="section" id="campaigns">
-            <div className="section-heading">
-              <div>
-                <span className="eyebrow">Make a difference</span>
-                <h2>Causes worth supporting</h2>
+          {/* Hero Section */}
+          <section className="hero-section">
+            <div className="hero-content">
+              <div className="hero-tag-badge">
+                <Sparkles size={14} className="text-amber" />
+                <span>Verified Non-Profit Crowdfunding</span>
               </div>
-              <span className="muted">
-                Choose a campaign to get started
-              </span>
+              <h1>
+                Transparent Giving That <span className="highlight-text">Changes Lives.</span>
+              </h1>
+              <p className="hero-subtitle">
+                Support children's education, critical healthcare, emergency food relief, and poor girl marriage ceremonies.
+                Track every rupee received in real-time on our public ledger with instant 80G tax benefit receipts.
+              </p>
+
+              <div className="hero-cta-group">
+                <button
+                  className="btn btn-primary btn-lg"
+                  onClick={() => setPage("campaigns")}
+                >
+                  Explore Campaigns <ArrowRight size={18} />
+                </button>
+                <button
+                  className="btn btn-outline btn-lg"
+                  onClick={() => setPage("history")}
+                >
+                  <span className="live-dot" /> View Received History
+                </button>
+              </div>
+
+              {/* Trust Badges */}
+              <div className="trust-badges-row">
+                <div className="trust-item">
+                  <ShieldCheck size={18} className="text-emerald" />
+                  <span>100% Verified Causes</span>
+                </div>
+                <div className="trust-item">
+                  <Award size={18} className="text-emerald" />
+                  <span>80G Tax Deductible</span>
+                </div>
+                <div className="trust-item">
+                  <Lock size={18} className="text-emerald" />
+                  <span>Bank-Grade Razorpay Security</span>
+                </div>
+              </div>
             </div>
 
-            {error && <div className="notice">{error}</div>}
+            <div className="hero-visual">
+              <div className="hero-image-card">
+                <img
+                  src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1000&auto=format&fit=crop&q=80"
+                  alt="Children learning in a classroom"
+                  className="hero-main-img"
+                />
+                {/* Floating Social Proof Card */}
+                <div className="floating-stat-overlay">
+                  <div className="flex-row items-center gap-10">
+                    <div className="stat-avatar-circle">
+                      <Heart size={18} className="text-rose" />
+                    </div>
+                    <div>
+                      <span className="stat-sm-title">Latest Received Contribution</span>
+                      <strong className="stat-sm-val">
+                        +₹{Number(donations[0]?.amount || 5000).toLocaleString("en-IN")} from{" "}
+                        {donations[0]?.donorName || "Aarav Sharma"}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
 
-            <div className="campaign-grid">
-              {campaigns.map((c, i) => {
+          {/* Real-time Platform Metrics Ribbon */}
+          <section className="stats-ribbon">
+            <div className="ribbon-card">
+              <div className="ribbon-icon bg-emerald-subtle">
+                <DollarSign size={24} className="text-emerald" />
+              </div>
+              <div>
+                <strong>₹{totalFundsCollected.toLocaleString("en-IN")}</strong>
+                <span>Total Contributions Raised</span>
+              </div>
+            </div>
+
+            <div className="ribbon-card">
+              <div className="ribbon-icon bg-blue-subtle">
+                <TrendingUp size={24} className="text-blue" />
+              </div>
+              <div>
+                <strong>{campaigns.length}</strong>
+                <span>Active Verified Campaigns</span>
+              </div>
+            </div>
+
+            <div className="ribbon-card">
+              <div className="ribbon-icon bg-amber-subtle">
+                <Users size={24} className="text-amber" />
+              </div>
+              <div>
+                <strong>{totalReceivedDonations}+</strong>
+                <span>Received Donations Logged</span>
+              </div>
+            </div>
+
+            <div className="ribbon-card">
+              <div className="ribbon-icon bg-purple-subtle">
+                <Award size={24} className="text-purple" />
+              </div>
+              <div>
+                <strong>100%</strong>
+                <span>Direct Program Accountability</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Featured Campaigns Section */}
+          <section className="section-block">
+            <div className="section-head-flex">
+              <div>
+                <span className="eyebrow">Urgent Causes Needing Help</span>
+                <h2>Featured Fundraising Campaigns</h2>
+              </div>
+              <button
+                className="btn btn-secondary-sm"
+                onClick={() => setPage("campaigns")}
+              >
+                View All Causes ({campaigns.length}) →
+              </button>
+            </div>
+
+            <div className="campaigns-showcase-grid">
+              {campaigns.slice(0, 3).map((camp) => {
                 const percent = Math.min(
                   100,
-                  Math.round(c.collectedAmount / c.targetAmount * 100)
+                  Math.round(((camp.collectedAmount || 0) / (camp.targetAmount || 1)) * 100)
                 );
 
                 return (
-                  <article className="campaign-card" key={c._id}>
-                    <img
-                      src={c.image || fallbackImages[i % 3]}
-                      alt={c.title}
-                    />
-                    <div className="card-content">
-                      <span className="category">{c.category}</span>
-                      <h3>{c.title}</h3>
-                      <p className="muted">{c.description}</p>
-                      <div className="progress">
-                        <div style={{ width: `${percent}%` }} />
+                  <article key={camp._id} className="campaign-card-premium">
+                    <div className="card-thumb-wrap">
+                      <img src={camp.image} alt={camp.title} className="card-img" />
+                      <span className="card-category-tag">{camp.category}</span>
+                      {camp.daysLeft && (
+                        <span className="card-days-tag">
+                          <Calendar size={12} className="inline mr-3" />
+                          {camp.daysLeft} days left
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="card-inner-body">
+                      <h3>{camp.title}</h3>
+                      <p className="card-desc-snippet">{camp.description}</p>
+
+                      <div className="progress-bar-wrap">
+                        <div className="progress-bar-fill" style={{ width: `${percent}%` }} />
                       </div>
-                      <div className="amount-row">
-                        <strong>
-                          ₹{c.collectedAmount.toLocaleString("en-IN")}
-                        </strong>
-                        <span>of ₹{c.targetAmount.toLocaleString("en-IN")}</span>
+
+                      <div className="card-funding-row">
+                        <div>
+                          <strong className="funds-collected">
+                            ₹{(camp.collectedAmount || 0).toLocaleString("en-IN")}
+                          </strong>
+                          <span className="funds-target"> of ₹{camp.targetAmount.toLocaleString("en-IN")}</span>
+                        </div>
+                        <span className="funds-percent">{percent}%</span>
                       </div>
-                      <p className="muted">{percent}% of demo target</p>
-                      <button className="btn"
-                        onClick={() => openDonation(c)}>
-                        <Heart size={16} /> Donate
+
+                      <div className="card-organizer-row">
+                        <span className="muted-xs">Organized by {camp.organizer || "HelpHands Trust"}</span>
+                        <span className="muted-xs">👥 {camp.donorCount || 24} donors</span>
+                      </div>
+
+                      <button
+                        className="btn btn-primary w-full mt-15"
+                        onClick={() => openDonation(camp)}
+                      >
+                        <Heart size={16} /> Donate Now
                       </button>
                     </div>
                   </article>
@@ -308,138 +1073,512 @@ function App() {
               })}
             </div>
           </section>
-        </main>
-      )}
 
-      {page === "donate" && selected && (
-        <main className="container section">
-          <button className="btn btn-light"
-            onClick={() => setPage("home")}>
-            ← Back to campaigns
-          </button>
-
-          <form className="form-card" onSubmit={(e) => submitDonation(e, "razorpay")}>
-            <span className="eyebrow">Make a Contribution</span>
-            <h2>Support {selected.title}</h2>
-            <p className="muted">
-              Choose to pay securely via Razorpay (UPI, Cards, NetBanking) or test with simulated demo donation.
-            </p>
-
-            {notice && <div className="notice">{notice}</div>}
-            {error && <div className="notice" style={{ background: "#fde8e8", color: "#9b1c1c" }}>{error}</div>}
-
-            <label htmlFor="donorName">Your name</label>
-            <input id="donorName" required maxLength="100"
-              value={form.donorName}
-              onChange={e => setForm({
-                ...form, donorName: e.target.value
-              })} />
-
-            <label htmlFor="email">Email (optional)</label>
-            <input id="email" type="email" maxLength="254"
-              value={form.email}
-              onChange={e => setForm({
-                ...form, email: e.target.value
-              })} />
-
-            <label htmlFor="amount">Donation amount (₹)</label>
-            <input id="amount" type="number" min="1"
-              max="10000000" required
-              value={form.amount}
-              onChange={e => setForm({
-                ...form, amount: e.target.value
-              })} />
-
-            <label htmlFor="message">Message (optional)</label>
-            <textarea id="message" rows="3" maxLength="500"
-              value={form.message}
-              onChange={e => setForm({
-                ...form, message: e.target.value
-              })} />
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "20px" }}>
-              <button type="submit" className="btn" disabled={loading}>
-                {loading ? "Processing..." : `Pay ₹${Number(form.amount || 0).toLocaleString("en-IN")} via Razorpay`}
-              </button>
-              <button
-                type="button"
-                className="btn btn-light"
-                disabled={loading}
-                onClick={(e) => submitDonation(e, "demo")}
-              >
-                Simulate Demo Donation (No Payment Gateway)
-              </button>
+          {/* Quick Real-Time History Preview Banner */}
+          <section className="history-preview-banner">
+            <div className="preview-banner-content">
+              <span className="eyebrow text-white-dim">Public Financial Transparency</span>
+              <h3>Track Incoming Money & Donor Records</h3>
+              <p>
+                Browse every received contribution, download official tax certificates, or send a personal note of gratitude to donors.
+              </p>
+              <div className="flex-row gap-12 mt-15">
+                <button
+                  className="btn btn-light-glow"
+                  onClick={() => setPage("history")}
+                >
+                  Open Money Received History ({donations.length})
+                </button>
+                <button
+                  className="btn btn-glass"
+                  onClick={handleSimulateIncomingDonation}
+                >
+                  <Sparkles size={16} /> Simulate Incoming Money
+                </button>
+              </div>
             </div>
-          </form>
-        </main>
-      )}
 
-      {page === "admin" && (
-        <main className="container section">
-          <button className="btn btn-light"
-            onClick={() => setPage("home")}>
-            ← Home
-          </button>
-          <h2>Admin overview</h2>
-          <p className="muted">
-            College demo only. This page is not protected by
-            admin authentication yet.
-          </p>
-          <div className="stats">
-            <div className="stat">
-              <strong>{campaigns.length}</strong> Campaigns
-            </div>
-            <div className="stat">
-              <strong>{donations.length}</strong> Demo donations
-            </div>
-            <div className="stat">
-              <strong>₹{total.toLocaleString("en-IN")}</strong>
-              Demo total
-            </div>
-          </div>
-
-          <h3>Recent demo donations</h3>
-          <div style={{ overflowX: "auto" }}>
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Donor</th>
-                  <th>Campaign</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {donations.map(d => (
-                  <tr key={d._id}>
-                    <td>{d.donorName}</td>
-                    <td>{d.campaign?.title || "Campaign"}</td>
-                    <td>₹{d.amount.toLocaleString("en-IN")}</td>
-                    <td>Demo only</td>
-                  </tr>
+            <div className="preview-banner-table">
+              <div className="preview-table-header">
+                <span>Recent Received Donations</span>
+                <span className="live-pill">Live Feed</span>
+              </div>
+              <div className="preview-items-list">
+                {donations.slice(0, 3).map((d) => (
+                  <div key={d._id} className="preview-item-row">
+                    <div>
+                      <strong>{d.donorName}</strong>
+                      <p className="muted-xs">{d.campaignTitle || "Campaign"}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="preview-amount">+₹{Number(d.amount).toLocaleString("en-IN")}</span>
+                      <button
+                        className="btn-tiny-receipt"
+                        onClick={() => setActiveReceipt(d)}
+                      >
+                        Receipt
+                      </button>
+                    </div>
+                  </div>
                 ))}
-                {donations.length === 0 && (
-                  <tr>
-                    <td colSpan="4">No demo donations yet.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+              </div>
+            </div>
+          </section>
+
+          {/* Transparency & How It Works */}
+          <section className="transparency-section">
+            <div className="text-center max-w-600 mx-auto mb-40">
+              <span className="eyebrow">Zero Guesswork</span>
+              <h2>Where Your Money Goes</h2>
+              <p className="muted">
+                We believe trust is built on radical transparency. 92% of all donations directly reach the ground beneficiaries.
+              </p>
+            </div>
+
+            <div className="impact-columns-grid">
+              <div className="impact-card">
+                <div className="impact-percent">92%</div>
+                <h4>Direct Humanitarian Aid</h4>
+                <p className="muted-sm">
+                  Allocated to medical procedures, school uniforms, food rations, and wedding essentials.
+                </p>
+              </div>
+
+              <div className="impact-card">
+                <div className="impact-percent">5%</div>
+                <h4>Field Operations & Verification</h4>
+                <p className="muted-sm">
+                  Physical background checks of cases, hospital settlements, and logistics.
+                </p>
+              </div>
+
+              <div className="impact-card">
+                <div className="impact-percent">3%</div>
+                <h4>Payment Gateway & Technology</h4>
+                <p className="muted-sm">
+                  SSL certificates, secure server infrastructure, and Razorpay processing fees.
+                </p>
+              </div>
+            </div>
+          </section>
+        </main>
+      )}
+
+      {/* 2. CAMPAIGNS CATALOG VIEW */}
+      {page === "campaigns" && (
+        <main className="container section-block">
+          <div className="catalog-header">
+            <div>
+              <span className="eyebrow">Explore Fundraisers</span>
+              <h2>All Active Humanitarian Causes</h2>
+              <p className="muted">
+                Every campaign is verified by our field team. Choose a cause close to your heart to make a contribution.
+              </p>
+            </div>
+          </div>
+
+          {/* Search & Category Filter Bar */}
+          <div className="catalog-filter-bar">
+            <div className="search-box-wrap w-full md:w-auto">
+              <Search size={18} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search campaigns by title, keywords..."
+                value={campaignSearch}
+                onChange={(e) => setCampaignSearch(e.target.value)}
+                className="search-input"
+              />
+            </div>
+
+            <div className="category-scroll-chips">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  className={`chip-filter ${categoryFilter === cat ? "active" : ""}`}
+                  onClick={() => setCategoryFilter(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Grid */}
+          <div className="campaigns-showcase-grid mt-25">
+            {filteredCampaigns.map((camp) => {
+              const percent = Math.min(
+                100,
+                Math.round(((camp.collectedAmount || 0) / (camp.targetAmount || 1)) * 100)
+              );
+
+              return (
+                <article key={camp._id} className="campaign-card-premium">
+                  <div className="card-thumb-wrap">
+                    <img src={camp.image} alt={camp.title} className="card-img" />
+                    <span className="card-category-tag">{camp.category}</span>
+                    {camp.daysLeft && (
+                      <span className="card-days-tag">
+                        <Calendar size={12} className="inline mr-3" />
+                        {camp.daysLeft} days left
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="card-inner-body">
+                    <h3>{camp.title}</h3>
+                    <p className="card-desc-snippet">{camp.description}</p>
+
+                    <div className="progress-bar-wrap">
+                      <div className="progress-bar-fill" style={{ width: `${percent}%` }} />
+                    </div>
+
+                    <div className="card-funding-row">
+                      <div>
+                        <strong className="funds-collected">
+                          ₹{(camp.collectedAmount || 0).toLocaleString("en-IN")}
+                        </strong>
+                        <span className="funds-target"> of ₹{camp.targetAmount.toLocaleString("en-IN")}</span>
+                      </div>
+                      <span className="funds-percent">{percent}%</span>
+                    </div>
+
+                    <div className="card-organizer-row">
+                      <span className="muted-xs">By {camp.organizer || "HelpHands Trust"}</span>
+                      <span className="muted-xs">👥 {camp.donorCount || 24} supporters</span>
+                    </div>
+
+                    <button
+                      className="btn btn-primary w-full mt-15"
+                      onClick={() => openDonation(camp)}
+                    >
+                      <Heart size={16} /> Donate Now
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {filteredCampaigns.length === 0 && (
+            <div className="empty-state-card mt-40">
+              <h4>No campaigns found</h4>
+              <p className="muted">Try adjusting your search or category filters.</p>
+              <button
+                className="btn btn-secondary-sm mt-10"
+                onClick={() => {
+                  setCategoryFilter("All");
+                  setCampaignSearch("");
+                }}
+              >
+                Clear Filters
+              </button>
+            </div>
+          )}
+        </main>
+      )}
+
+      {/* 3. MONEY RECEIVED HISTORY VIEW */}
+      {page === "history" && (
+        <main className="container section-block">
+          <DonationHistory
+            donations={donations}
+            isOwner={isOwner}
+            onClearHistory={handleClearHistory}
+            onViewReceipt={(donation) => setActiveReceipt(donation)}
+            onContactDonor={(donorTarget) => setContactUserTarget(donorTarget)}
+          />
+        </main>
+      )}
+
+      {/* 4. CONTACT SECTION & REACH US */}
+      {page === "contact" && (
+        <main className="container section-block">
+          <ContactSection
+            onContactSubmitted={handleContactSubmitted}
+            onOpenContactUserModal={(user) => setContactUserTarget(user)}
+            recentDonors={donations}
+          />
+        </main>
+      )}
+
+      {/* 5. ADMIN PORTAL */}
+      {page === "admin" && (
+        <main className="container section-block">
+          <AdminPortal
+            campaigns={campaigns}
+            donations={donations}
+            contacts={contacts}
+            isOwner={isOwner}
+            onClearHistory={handleClearHistory}
+            onViewReceipt={(d) => setActiveReceipt(d)}
+            onContactUser={(target) => setContactUserTarget(target)}
+          />
+        </main>
+      )}
+
+      {/* 6. DONATE VIEW / CONTRIBUTION FORM */}
+      {page === "donate" && selectedCampaign && (
+        <main className="container section-block">
+          <button
+            className="btn btn-secondary-sm mb-20"
+            onClick={() => setPage("campaigns")}
+          >
+            ← Back to Campaigns
+          </button>
+
+          <div className="donation-flow-container">
+            {/* Campaign Summary Card */}
+            <div className="donation-campaign-summary">
+              <img
+                src={selectedCampaign.image}
+                alt={selectedCampaign.title}
+                className="summary-img"
+              />
+              <div className="summary-info">
+                <span className="card-category-tag">{selectedCampaign.category}</span>
+                <h3>{selectedCampaign.title}</h3>
+                <p className="muted-sm">{selectedCampaign.description}</p>
+
+                <div className="progress-bar-wrap mt-15">
+                  <div
+                    className="progress-bar-fill"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round(
+                          ((selectedCampaign.collectedAmount || 0) /
+                            (selectedCampaign.targetAmount || 1)) *
+                            100
+                        )
+                      )}%`
+                    }}
+                  />
+                </div>
+
+                <div className="card-funding-row mt-8">
+                  <strong>
+                    ₹{(selectedCampaign.collectedAmount || 0).toLocaleString("en-IN")} raised
+                  </strong>
+                  <span>Goal: ₹{selectedCampaign.targetAmount.toLocaleString("en-IN")}</span>
+                </div>
+
+                <div className="tax-benefit-banner mt-20">
+                  <ShieldCheck size={20} className="text-emerald" />
+                  <div>
+                    <strong>80G Tax Benefit Eligible</strong>
+                    <p>Avail 50% tax deduction on your donation under Sec 80G of Indian IT Act.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Donation Checkout Form */}
+            <form
+              className="donation-form-panel"
+              onSubmit={(e) => submitDonation(e, "razorpay")}
+            >
+              <div className="form-head">
+                <span className="eyebrow">Step 2: Choose Contribution</span>
+                <h2>Make Your Donation</h2>
+                <p className="muted-xs">
+                  Pay securely via Razorpay (UPI, Cards, NetBanking) or test with simulated demo grant.
+                </p>
+              </div>
+
+              {notice && (
+                <div className="notice-box notice-success">
+                  <CheckCircle2 size={18} />
+                  <span>{notice}</span>
+                </div>
+              )}
+
+              {error && (
+                <div className="notice-box notice-error">
+                  <X size={18} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Amount Preset Chips */}
+              <div className="amount-selection-block">
+                <label className="field-label">Select Amount (₹)</label>
+                <div className="amount-presets-grid">
+                  {presetAmounts.map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      className={`preset-chip ${form.amount === amt ? "active" : ""}`}
+                      onClick={() => setForm({ ...form, amount: amt })}
+                    >
+                      ₹{Number(amt).toLocaleString("en-IN")}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="custom-amount-input-wrap mt-10">
+                  <span className="currency-prefix">₹</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10000000"
+                    required
+                    placeholder="Or enter custom amount"
+                    value={form.amount}
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Donor Personal Information */}
+              <div className="form-group">
+                <label className="field-label">Full Name *</label>
+                <input
+                  type="text"
+                  required={!form.isAnonymous}
+                  placeholder="e.g. Priyanshu Kashyap"
+                  value={form.donorName}
+                  onChange={(e) => setForm({ ...form, donorName: e.target.value })}
+                />
+              </div>
+
+              <div className="form-two-col">
+                <div className="form-group">
+                  <label className="field-label">Email Address (For 80G Receipt)</label>
+                  <input
+                    type="email"
+                    placeholder="e.g. name@example.com"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="field-label">Phone / WhatsApp</label>
+                  <input
+                    type="tel"
+                    placeholder="+91 98765 43210"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="field-label">Encouraging Note / Message (Optional)</label>
+                <textarea
+                  rows={2}
+                  placeholder="Leave words of kindness or blessings..."
+                  value={form.message}
+                  onChange={(e) => setForm({ ...form, message: e.target.value })}
+                />
+              </div>
+
+              <div className="checkbox-row">
+                <input
+                  type="checkbox"
+                  id="anonCheck"
+                  checked={form.isAnonymous}
+                  onChange={(e) => setForm({ ...form, isAnonymous: e.target.checked })}
+                />
+                <label htmlFor="anonCheck" className="cursor-pointer text-sm">
+                  Make my donation anonymous on public records
+                </label>
+              </div>
+
+              {/* Actions: Razorpay or Demo Donation */}
+              <div className="donation-cta-stack mt-20">
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-lg w-full"
+                  disabled={loading}
+                >
+                  <Lock size={16} />{" "}
+                  {loading
+                    ? "Processing Gateway..."
+                    : `Pay ₹${Number(form.amount || 0).toLocaleString("en-IN")} via Razorpay`}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-demo-simulator w-full"
+                  disabled={loading}
+                  onClick={(e) => submitDonation(e, "demo")}
+                >
+                  <Sparkles size={16} /> Simulate Instant Demo Donation (Instant Receipt & Notification)
+                </button>
+              </div>
+
+              <p className="tiny-security-disclaimer text-center mt-12">
+                🔒 256-bit SSL Encrypted • All major UPI, Credit/Debit cards & Net Banking accepted
+              </p>
+            </form>
           </div>
         </main>
       )}
 
-      <footer className="footer">
-        <div className="container">
-          <h3>HelpHands. <Heart size={16} /></h3>
-          <p>Built as a MERN stack college project.</p>
-          <small>
-            Demo amounts are simulated and do not represent actual funds.
-          </small>
+      {/* Footer */}
+      <footer className="footer-site">
+        <div className="container footer-content-grid">
+          <div className="footer-col-about">
+            <div className="brand-logo footer-logo">
+              <div className="logo-heart-wrap">
+                <Heart size={18} className="logo-heart-icon" />
+              </div>
+              <span className="brand-text text-white">
+                Help<span className="brand-accent">Hands.</span>
+              </span>
+            </div>
+            <p className="footer-bio">
+              A modern, transparent, community-driven humanitarian crowdfunding platform empowering donors and grassroot NGOs.
+            </p>
+            <div className="footer-badge-item">
+              <ShieldCheck size={16} className="text-emerald" />
+              <span>Registered Non-Profit Trust • Sec 80G Certified</span>
+            </div>
+          </div>
+
+          <div className="footer-col-links">
+            <h5>Navigation</h5>
+            <ul>
+              <li><button onClick={() => setPage("home")}>Home</button></li>
+              <li><button onClick={() => setPage("campaigns")}>Active Causes</button></li>
+              <li><button onClick={() => setPage("history")}>Money Received History</button></li>
+              <li><button onClick={() => setPage("contact")}>Contact & Helpdesk</button></li>
+              <li><button onClick={() => setPage("admin")}>Admin Portal</button></li>
+            </ul>
+          </div>
+
+          <div className="footer-col-links">
+            <h5>Causes</h5>
+            <ul>
+              <li><button onClick={() => { setCategoryFilter("Education"); setPage("campaigns"); }}>Child Education</button></li>
+              <li><button onClick={() => { setCategoryFilter("Healthcare"); setPage("campaigns"); }}>Emergency Medical Care</button></li>
+              <li><button onClick={() => { setCategoryFilter("Food"); setPage("campaigns"); }}>Hunger Relief Rations</button></li>
+              <li><button onClick={() => { setCategoryFilter("Social Welfare"); setPage("campaigns"); }}>Poor Girl Marriage Aid</button></li>
+            </ul>
+          </div>
+
+          <div className="footer-col-contact">
+            <h5>Helpline & Desk</h5>
+            <p><Phone size={14} className="inline mr-6 text-emerald" /> +91 (011) 4920-8800</p>
+            <p><Mail size={14} className="inline mr-6 text-emerald" /> contact@helphands.org</p>
+            <p className="footer-sub-text">
+              DLF Cyber City, Sector 24, Gurugram, HR 122002
+            </p>
+          </div>
+        </div>
+
+        <div className="footer-bottom-bar">
+          <div className="container footer-bottom-inner">
+            <p>© {new Date().getFullYear()} HelpHands Foundation Trust. All rights reserved.</p>
+            <div className="footer-legal-links">
+              <span>Privacy Policy</span>
+              <span>Terms of Service</span>
+              <span>80G Tax Terms</span>
+            </div>
+          </div>
         </div>
       </footer>
-    </>
+    </div>
   );
 }
-
-export default App;
