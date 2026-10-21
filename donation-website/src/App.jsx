@@ -20,7 +20,9 @@ import {
   X,
   FileText,
   Menu,
-  Crown
+  Crown,
+  Key,
+  Gift
 } from "lucide-react";
 import "./index.css";
 
@@ -37,8 +39,10 @@ import ContactSection from "./components/ContactSection";
 import ContactUserModal from "./components/ContactUserModal";
 import ReceiptModal from "./components/ReceiptModal";
 import AdminPortal from "./components/AdminPortal";
+import AdminLogin from "./components/AdminLogin";
+import Sidebar from "./components/Sidebar";
+import RequestAccessModal from "./components/RequestAccessModal";
 import Toast from "./components/Toast";
-import AccessGate from "./components/AccessGate";
 import API from "./config/api";
 
 export default function App() {
@@ -49,7 +53,6 @@ export default function App() {
   });
 
   const [donations, setDonations] = useState(() => {
-    // Clear out old previous history as requested by owner
     const cacheVersion = localStorage.getItem("helphands_cache_v");
     if (cacheVersion !== "clean_v3") {
       localStorage.removeItem("helphands_donations");
@@ -75,21 +78,17 @@ export default function App() {
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRequestAccessOpen, setIsRequestAccessOpen] = useState(false);
   const [activeReceipt, setActiveReceipt] = useState(null);
   const [contactUserTarget, setContactUserTarget] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [campaignSearch, setCampaignSearch] = useState("");
 
-  // Platform Access Gate control state
-  const [hasAccess, setHasAccess] = useState(() => {
-    return sessionStorage.getItem("helphands_has_access") === "true";
-  });
-  const [accessUser, setAccessUser] = useState(() => {
-    return sessionStorage.getItem("helphands_access_user") || "aky952372@gmail.com";
-  });
-  const [isOwner, setIsOwner] = useState(() => {
-    return sessionStorage.getItem("helphands_is_owner") === "true";
+  // Admin authentication state (Protected /admin route)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
+    return sessionStorage.getItem("helphands_is_admin") === "true";
   });
 
   // Donation Form state
@@ -201,57 +200,62 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
-  // Access control handlers
-  function handleGrantAccess(authInfo) {
-    const userName = authInfo.name || "Verified Member";
-    const userIsOwner = authInfo.isOwner || authInfo.email === "aky952372@gmail.com";
-    setHasAccess(true);
-    setAccessUser(userName);
-    setIsOwner(userIsOwner);
-    sessionStorage.setItem("helphands_has_access", "true");
-    sessionStorage.setItem("helphands_access_user", userName);
-    sessionStorage.setItem("helphands_is_owner", userIsOwner ? "true" : "false");
+  // URL Route detection for /admin and #admin
+  useEffect(() => {
+    const handleRouteSync = () => {
+      const path = window.location.pathname;
+      const hash = window.location.hash;
+      if (path.startsWith("/admin") || hash === "#admin" || hash.startsWith("#/admin")) {
+        setPage("admin");
+      }
+    };
+    handleRouteSync();
+    window.addEventListener("popstate", handleRouteSync);
+    window.addEventListener("hashchange", handleRouteSync);
+    return () => {
+      window.removeEventListener("popstate", handleRouteSync);
+      window.removeEventListener("hashchange", handleRouteSync);
+    };
+  }, []);
 
+  // Admin authentication handlers
+  function handleAdminLoginSuccess(data) {
+    setIsAdminAuthenticated(true);
     addToast({
       type: "success",
-      title: userIsOwner ? "Owner Access Granted" : "Access Granted",
-      message: userIsOwner
-        ? "Welcome, Owner (aky952372@gmail.com)! Full management unlocked."
-        : `Welcome, ${userName}! Website is unlocked.`,
-      badge: userIsOwner ? "Owner" : "Authorized"
+      title: "Admin Authenticated",
+      message: "Administrator session started.",
+      badge: "Administrator"
     });
-
-    const notif = {
-      id: "notif-access-" + Date.now(),
-      type: "milestone",
-      title: userIsOwner ? "Owner Session Started" : "Access Granted",
-      message: `${userName} entered the website via ${authInfo.method}.`,
-      time: "Just now",
-      timestamp: Date.now(),
-      read: false
-    };
-    setNotifications((prev) => [notif, ...prev]);
   }
 
-  function handleRemoveAccess() {
-    setHasAccess(false);
-    setIsOwner(false);
-    sessionStorage.removeItem("helphands_has_access");
-    sessionStorage.removeItem("helphands_access_user");
-    sessionStorage.removeItem("helphands_is_owner");
-
+  function handleAdminLogout() {
+    setIsAdminAuthenticated(false);
+    sessionStorage.removeItem("helphands_is_admin");
+    sessionStorage.removeItem("helphands_admin_token");
+    setPage("home");
+    if (window.location.hash.startsWith("#admin") || window.location.pathname.startsWith("/admin")) {
+      window.history.pushState(null, "", "/");
+    }
     addToast({
       type: "contact",
-      title: "Access Locked",
-      message: "Access removed. Owner email or passcode required to enter.",
-      badge: "Locked"
+      title: "Logged Out",
+      message: "Administrator session safely ended.",
+      badge: "Logged Out"
     });
   }
 
   function handleClearHistory() {
     setDonations([]);
     localStorage.removeItem("helphands_donations");
-    fetch(`${API}/donations/clear-all`, { method: "DELETE" }).catch(() => {});
+    const token = sessionStorage.getItem("helphands_admin_token");
+    fetch(`${API}/donations/clear-all`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    }).catch(() => { });
 
     addToast({
       type: "contact",
@@ -291,10 +295,10 @@ export default function App() {
       prev.map((c) =>
         c._id === randomCampaign._id
           ? {
-              ...c,
-              collectedAmount: (c.collectedAmount || 0) + randomAmount,
-              donorCount: (c.donorCount || 1) + 1
-            }
+            ...c,
+            collectedAmount: (c.collectedAmount || 0) + randomAmount,
+            donorCount: (c.donorCount || 1) + 1
+          }
           : c
       )
     );
@@ -365,7 +369,7 @@ export default function App() {
             amount: numericAmount,
             message: form.message
           })
-        }).catch(() => {});
+        }).catch(() => { });
 
         // Local state update
         const recordedDonation = {
@@ -391,10 +395,10 @@ export default function App() {
           prev.map((c) =>
             c._id === selectedCampaign._id
               ? {
-                  ...c,
-                  collectedAmount: (c.collectedAmount || 0) + numericAmount,
-                  donorCount: (c.donorCount || 1) + 1
-                }
+                ...c,
+                collectedAmount: (c.collectedAmount || 0) + numericAmount,
+                donorCount: (c.donorCount || 1) + 1
+              }
               : c
           )
         );
@@ -540,10 +544,10 @@ export default function App() {
               prev.map((c) =>
                 c._id === selectedCampaign._id
                   ? {
-                      ...c,
-                      collectedAmount: (c.collectedAmount || 0) + numericAmount,
-                      donorCount: (c.donorCount || 1) + 1
-                    }
+                    ...c,
+                    collectedAmount: (c.collectedAmount || 0) + numericAmount,
+                    donorCount: (c.donorCount || 1) + 1
+                  }
                   : c
               )
             );
@@ -618,7 +622,7 @@ export default function App() {
     } catch (err) {
       setError(
         err.message ||
-          "Could not initialize Razorpay gateway. Tip: Click 'Simulate Instant Demo Donation' below to test immediately!"
+        "Could not initialize Razorpay gateway. Tip: Click 'Simulate Instant Demo Donation' below to test immediately!"
       );
       setLoading(false);
     }
@@ -639,7 +643,7 @@ export default function App() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(contactData)
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Create notification
     const newNotif = {
@@ -706,10 +710,32 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      {/* Platform Access Gate: Prompts for Access Passcode / Approval when opening website */}
-      {!hasAccess && (
-        <AccessGate onGrantAccess={handleGrantAccess} />
-      )}
+      {/* Professional Sidebar Navigation */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        currentPage={page}
+        onNavigate={(p) => setPage(p)}
+        onRequestAccessClick={() => setIsRequestAccessOpen(true)}
+        onSelectCategory={(cat) => {
+          setCategoryFilter(cat);
+          setPage("campaigns");
+        }}
+      />
+
+      {/* Professional Request Access Modal */}
+      <RequestAccessModal
+        isOpen={isRequestAccessOpen}
+        onClose={() => setIsRequestAccessOpen(false)}
+        onRequestSubmitted={() => {
+          addToast({
+            type: "success",
+            title: "Request Received",
+            message: "Your access request has been sent for administrative review.",
+            badge: "Submitted"
+          });
+        }}
+      />
 
       {/* Real-time Toast Notifications Portal */}
       <Toast toasts={toasts} onDismiss={dismissToast} />
@@ -734,25 +760,37 @@ export default function App() {
       {/* Top Glassmorphism Navigation Bar */}
       <header className="navbar-wrapper">
         <div className="container navbar-inner">
-          {/* Brand Logo */}
-          <a
-            href="#home"
-            className="brand-logo"
-            onClick={(e) => {
-              e.preventDefault();
-              setPage("home");
-            }}
-          >
-            <div className="logo-heart-wrap">
-              <Heart size={20} className="logo-heart-icon" />
-            </div>
-            <div className="brand-text">
-              <span>Help</span>
-              <span className="brand-accent">Hands.</span>
-            </div>
-          </a>
+          {/* Brand Logo & Sidebar Toggle */}
+          <div className="flex-row items-center gap-12">
+            <button
+              type="button"
+              className="btn-sidebar-toggle"
+              onClick={() => setIsSidebarOpen(true)}
+              aria-label="Open sidebar navigation"
+            >
+              <Menu size={18} />
+              <span>Menu</span>
+            </button>
 
-          {/* Navigation Links */}
+            <a
+              href="#home"
+              className="brand-logo"
+              onClick={(e) => {
+                e.preventDefault();
+                setPage("home");
+              }}
+            >
+              <div className="logo-heart-wrap">
+                <Heart size={20} className="logo-heart-icon" />
+              </div>
+              <div className="brand-text">
+                <span>Help</span>
+                <span className="brand-accent">Hands.</span>
+              </div>
+            </a>
+          </div>
+
+          {/* Public Navigation Links */}
           <nav className="nav-menu">
             <button
               className={`nav-link ${page === "home" ? "active" : ""}`}
@@ -778,12 +816,6 @@ export default function App() {
               onClick={() => setPage("contact")}
             >
               Contact Us
-            </button>
-            <button
-              className={`nav-link ${page === "admin" ? "active" : ""}`}
-              onClick={() => setPage("admin")}
-            >
-              Admin Portal
             </button>
           </nav>
 
@@ -833,25 +865,6 @@ export default function App() {
               <Heart size={16} /> Donate Now
             </button>
 
-            {/* Owner badge if logged in as owner */}
-            {isOwner && (
-              <div className="owner-status-pill" title="Verified Owner: aky952372@gmail.com">
-                <Crown size={14} className="text-amber" />
-                <span className="owner-pill-text">Owner: aky952372@gmail.com</span>
-              </div>
-            )}
-
-            {/* Lock Website / Remove Access Button */}
-            <button
-              className="btn-lock-access"
-              onClick={handleRemoveAccess}
-              title="Lock Platform & Remove Access"
-              aria-label="Remove Access"
-            >
-              <Lock size={15} />
-              <span className="lock-btn-label">Lock Access</span>
-            </button>
-
             {/* Mobile menu toggle */}
             <button
               className="btn-mobile-menu-toggle"
@@ -888,19 +901,16 @@ export default function App() {
               className={`mobile-nav-link ${page === "contact" ? "active" : ""}`}
               onClick={() => { setPage("contact"); setIsMobileMenuOpen(false); }}
             >
-              Contact Us & Community
+              Contact Us & Helpdesk
             </button>
             <button
-              className={`mobile-nav-link ${page === "admin" ? "active" : ""}`}
-              onClick={() => { setPage("admin"); setIsMobileMenuOpen(false); }}
+              className="mobile-nav-link"
+              onClick={() => {
+                setIsRequestAccessOpen(true);
+                setIsMobileMenuOpen(false);
+              }}
             >
-              Admin Portal
-            </button>
-            <button
-              className="mobile-nav-link text-danger"
-              onClick={() => { handleRemoveAccess(); setIsMobileMenuOpen(false); }}
-            >
-              <Lock size={15} /> Lock & Remove Access
+              <Key size={15} className="text-emerald inline mr-6" /> Request Access
             </button>
           </div>
         )}
@@ -1023,6 +1033,147 @@ export default function App() {
               <div>
                 <strong>100%</strong>
                 <span>Direct Program Accountability</span>
+              </div>
+            </div>
+          </section>
+
+          {/* SPOTLIGHT 1: Helping Poor Families & Hunger Relief (Requirement 4) */}
+          <section className="spotlight-card-banner">
+            <div className="spotlight-text-col">
+              <span className="spotlight-badge spotlight-badge-amber">
+                <Users size={13} /> Emergency Family Relief
+              </span>
+              <h3>Ration Kits & Sustenance for Needy Families</h3>
+              <p>
+                No family should have to sleep on an empty stomach. Our volunteer network distributes essential monthly grocery kits containing wheat flour, rice, pulses, and cooking oil directly to vulnerable households and daily wage workers.
+              </p>
+
+              <div className="spotlight-perks-list">
+                <div className="spotlight-perk-item">
+                  <CheckCircle2 size={16} className="text-emerald" />
+                  <span>1-Month Essential Ration Kit</span>
+                </div>
+                <div className="spotlight-perk-item">
+                  <CheckCircle2 size={16} className="text-emerald" />
+                  <span>Doorstep Volunteer Delivery</span>
+                </div>
+                <div className="spotlight-perk-item">
+                  <CheckCircle2 size={16} className="text-emerald" />
+                  <span>100% Direct Account Proof</span>
+                </div>
+                <div className="spotlight-perk-item">
+                  <CheckCircle2 size={16} className="text-emerald" />
+                  <span>Instant 80G Tax Exemption</span>
+                </div>
+              </div>
+
+              <div className="flex-row items-center gap-12 flex-wrap">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const foodCamp = campaigns.find((c) => c.category === "Food") || campaigns[1] || campaigns[0];
+                    openDonation(foodCamp);
+                  }}
+                >
+                  <Heart size={16} /> Feed a Needy Family (Donate)
+                </button>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => {
+                    setCategoryFilter("Food");
+                    setPage("campaigns");
+                  }}
+                >
+                  View Food Fundraisers →
+                </button>
+              </div>
+            </div>
+
+            <div className="spotlight-img-col">
+              <img
+                src="https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=900&auto=format&fit=crop&q=80"
+                alt="Volunteers providing emergency food relief kits"
+                className="spotlight-img"
+              />
+              <div className="spotlight-stat-float">
+                <div>
+                  <span className="muted-xs">Active Family Food Program</span>
+                  <strong className="block text-emerald">600+ Rations Distributed</strong>
+                </div>
+                <span className="status-pill-success status-pill-xs">Verified Active</span>
+              </div>
+            </div>
+          </section>
+
+          {/* SPOTLIGHT 2: Marriage Assistance for Underprivileged Girls (Requirement 4) */}
+          <section className="spotlight-card-banner">
+            <div className="spotlight-img-col">
+              <img
+                src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=900&auto=format&fit=crop&q=80"
+                alt="Underprivileged girl marriage assistance ceremony"
+                className="spotlight-img"
+              />
+              <div className="spotlight-stat-float">
+                <div>
+                  <span className="muted-xs">Kanyadaan Dignity Initiative</span>
+                  <strong className="block text-rose">53+ Brides Blessed</strong>
+                </div>
+                <span className="status-pill-success status-pill-xs">Social Welfare</span>
+              </div>
+            </div>
+
+            <div className="spotlight-text-col">
+              <span className="spotlight-badge spotlight-badge-rose">
+                <Gift size={13} /> Marriage Assistance (Kanyadaan)
+              </span>
+              <h3>Dignified Marriage Support for Poor Girls</h3>
+              <p>
+                Financially struggling parents often face catastrophic debt or exploitation when organizing their daughter's marriage. HelpHands provides dignified wedding packages including bridal attire, essential cookware, and ceremony support so every young bride steps forward with pride and honor.
+              </p>
+
+              <div className="spotlight-perks-list">
+                <div className="spotlight-perk-item">
+                  <CheckCircle2 size={16} className="text-emerald" />
+                  <span>Bridal Wear & Essentials</span>
+                </div>
+                <div className="spotlight-perk-item">
+                  <CheckCircle2 size={16} className="text-emerald" />
+                  <span>Household Starter Utensils</span>
+                </div>
+                <div className="spotlight-perk-item">
+                  <CheckCircle2 size={16} className="text-emerald" />
+                  <span>Verified Low-Income Families</span>
+                </div>
+                <div className="spotlight-perk-item">
+                  <CheckCircle2 size={16} className="text-emerald" />
+                  <span>Zero Administrative Cut</span>
+                </div>
+              </div>
+
+              <div className="flex-row items-center gap-12 flex-wrap">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const marriageCamp =
+                      campaigns.find(
+                        (c) =>
+                          c.title.toLowerCase().includes("marriage") ||
+                          c.category === "Social Welfare"
+                      ) || campaigns[3] || campaigns[0];
+                    openDonation(marriageCamp);
+                  }}
+                >
+                  <Gift size={16} /> Support a Daughter's Marriage
+                </button>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => {
+                    setCategoryFilter("Social Welfare");
+                    setPage("campaigns");
+                  }}
+                >
+                  Learn About Kanyadaan →
+                </button>
               </div>
             </div>
           </section>
@@ -1372,7 +1523,7 @@ export default function App() {
                         Math.round(
                           ((selectedCampaign.collectedAmount || 0) /
                             (selectedCampaign.targetAmount || 1)) *
-                            100
+                          100
                         )
                       )}%`
                     }}
@@ -1568,7 +1719,7 @@ export default function App() {
               <li><button onClick={() => setPage("campaigns")}>Active Causes</button></li>
               <li><button onClick={() => setPage("history")}>Money Received History</button></li>
               <li><button onClick={() => setPage("contact")}>Contact & Helpdesk</button></li>
-              <li><button onClick={() => setPage("admin")}>Admin Portal</button></li>
+              <li><button onClick={() => setIsRequestAccessOpen(true)}>Request Access</button></li>
             </ul>
           </div>
 
@@ -1584,10 +1735,10 @@ export default function App() {
 
           <div className="footer-col-contact">
             <h5>Helpline & Desk</h5>
-            <p><Phone size={14} className="inline mr-6 text-emerald" /> +91 (011) 4920-8800</p>
-            <p><Mail size={14} className="inline mr-6 text-emerald" /> contact@helphands.org</p>
+            <p><Phone size={14} className="inline mr-6 text-emerald" /> +91 7352097919</p>
+            <p><Mail size={14} className="inline mr-6 text-emerald" /> aky952372@gmail.com</p>
             <p className="footer-sub-text">
-              DLF Cyber City, Sector 24, Gurugram, HR 122002
+              Pandit Pur, Chhapra(Saran), Bihar, 841224
             </p>
           </div>
         </div>

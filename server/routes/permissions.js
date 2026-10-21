@@ -1,34 +1,26 @@
 import express from "express";
 import PermissionRequest from "../models/PermissionRequest.js";
+import { requireAdminAuth } from "../middleware/auth.js";
 
 const router = express.Router();
-const OWNER_EMAIL = "aky952372@gmail.com";
+const OWNER_EMAIL = (process.env.ADMIN_EMAIL || "aky952372@gmail.com").toLowerCase();
 
-// Submit a permission request to the owner
+// Submit a permission/access request (Public from sidebar)
 router.post("/request", async (req, res) => {
   try {
     const { name, email, phone, reason } = req.body;
     if (!name?.trim() || !email?.trim()) {
-      return res.status(400).json({ message: "Name and email are required to request permission." });
+      return res.status(400).json({ message: "Full name and email address are required." });
     }
 
     const cleanEmail = email.trim().toLowerCase();
-
-    // If owner requested, automatically approved
-    if (cleanEmail === OWNER_EMAIL) {
-      return res.status(200).json({
-        message: "You are the platform owner. Access is always granted.",
-        status: "approved",
-        isOwner: true
-      });
-    }
 
     // Check if an existing request already exists
     let existing = await PermissionRequest.findOne({ email: cleanEmail });
     if (existing) {
       if (existing.status === "approved") {
         return res.json({
-          message: "Your permission has already been approved by the owner!",
+          message: "Your access request has already been approved!",
           request: existing,
           status: "approved"
         });
@@ -38,7 +30,7 @@ router.post("/request", async (req, res) => {
       existing.reason = reason?.trim() || existing.reason;
       await existing.save();
       return res.status(200).json({
-        message: `Permission request re-sent to website owner (${OWNER_EMAIL}). Waiting for approval.`,
+        message: "Your access request has been updated and is currently under review.",
         request: existing,
         status: existing.status
       });
@@ -48,19 +40,19 @@ router.post("/request", async (req, res) => {
       name: name.trim(),
       email: cleanEmail,
       phone: phone?.trim() || "",
-      reason: reason?.trim() || "Requesting access to browse campaigns and contribute",
+      reason: reason?.trim() || "Requesting partner/volunteer access",
       ownerEmail: OWNER_EMAIL,
       status: "pending"
     });
 
     res.status(201).json({
-      message: `Permission request submitted to website owner (${OWNER_EMAIL}).`,
+      message: "Your access request has been submitted successfully. Our team will review your application.",
       request: newRequest,
       status: "pending"
     });
   } catch (err) {
     console.error("Permission request error:", err);
-    res.status(500).json({ message: "Unable to submit permission request" });
+    res.status(500).json({ message: "Unable to submit access request at this time." });
   }
 });
 
@@ -69,14 +61,6 @@ router.post("/verify", async (req, res) => {
   try {
     const { email, accessCode } = req.body;
     const cleanEmail = email ? email.trim().toLowerCase() : "";
-
-    if (cleanEmail === OWNER_EMAIL || accessCode === "1234" || accessCode === "helphands" || accessCode === "admin") {
-      return res.json({
-        approved: true,
-        isOwner: cleanEmail === OWNER_EMAIL || accessCode === "admin",
-        name: cleanEmail === OWNER_EMAIL ? "Platform Owner" : "Verified Member"
-      });
-    }
 
     let query = {};
     if (cleanEmail) query.email = cleanEmail;
@@ -88,7 +72,7 @@ router.post("/verify", async (req, res) => {
 
     const record = await PermissionRequest.findOne(query);
     if (!record) {
-      return res.json({ approved: false, message: "No permission record found. Please request permission." });
+      return res.json({ approved: false, message: "No access record found. Please submit an access request." });
     }
 
     if (record.status === "approved") {
@@ -97,7 +81,7 @@ router.post("/verify", async (req, res) => {
         name: record.name,
         email: record.email,
         accessCode: record.accessCode,
-        message: "Permission granted by owner!"
+        message: "Access granted."
       });
     }
 
@@ -105,26 +89,26 @@ router.post("/verify", async (req, res) => {
       approved: false,
       status: record.status,
       message: record.status === "pending"
-        ? `Your request is currently pending approval by ${OWNER_EMAIL}.`
-        : `Your request was declined by ${OWNER_EMAIL}.`
+        ? "Your request is currently pending administrative review."
+        : "Your request was declined."
     });
   } catch (err) {
-    res.status(500).json({ message: "Verification failed" });
+    res.status(500).json({ message: "Verification failed." });
   }
 });
 
-// Get all permission requests (For owner aky952372@gmail.com)
-router.get("/", async (req, res) => {
+// Get all permission requests (Protected: Admin authentication required)
+router.get("/", requireAdminAuth, async (req, res) => {
   try {
     const requests = await PermissionRequest.find().sort({ createdAt: -1 });
     res.json(requests);
   } catch (err) {
-    res.status(500).json({ message: "Unable to load permission requests" });
+    res.status(500).json({ message: "Unable to load permission requests." });
   }
 });
 
-// Owner approves or rejects a request
-router.patch("/:id", async (req, res) => {
+// Admin approves or rejects a request (Protected: Admin authentication required)
+router.patch("/:id", requireAdminAuth, async (req, res) => {
   try {
     const { status } = req.body;
     if (!["approved", "rejected", "pending"].includes(status)) {
@@ -143,11 +127,11 @@ router.patch("/:id", async (req, res) => {
     }
 
     res.json({
-      message: `Permission ${status} by owner.`,
+      message: `Access request marked as ${status}.`,
       request: updated
     });
   } catch (err) {
-    res.status(500).json({ message: "Unable to update permission status" });
+    res.status(500).json({ message: "Unable to update access status" });
   }
 });
 

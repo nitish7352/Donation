@@ -29,8 +29,10 @@ export function getApiBaseUrl() {
     ""
   ).trim();
 
-  // In production builds, never use localhost
-  if (import.meta.env.PROD) {
+  const onLocal = isLocalhost();
+
+  // In production builds or when running on public domain (like Vercel):
+  if (!onLocal || import.meta.env.PROD) {
     if (envUrl) {
       const isLoopback =
         envUrl.includes("localhost") ||
@@ -42,10 +44,11 @@ export function getApiBaseUrl() {
         return clean;
       }
     }
+    // Deployed domain fallback: use same-origin relative path /api
     return "";
   }
 
-  // In development:
+  // In local development on localhost/127.0.0.1:
   if (envUrl) {
     let clean = envUrl.replace(/\/+$/, "");
     if (clean.endsWith("/api")) clean = clean.slice(0, -4);

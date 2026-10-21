@@ -1,6 +1,7 @@
 
 import express from "express";
 import Campaign from "../models/Campaign.js";
+import { requireAdminAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -18,8 +19,8 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Add a campaign (college demo only; protect in production)
-router.post("/", async (req, res) => {
+// Add a campaign (Protected: Admin authentication required)
+router.post("/", requireAdminAuth, async (req, res) => {
   try {
     const { title, description, category, image, targetAmount } =
       req.body;

@@ -7,6 +7,7 @@ import campaignRoutes from "./routes/campaigns.js";
 import donationRoutes from "./routes/donations.js";
 import contactRoutes from "./routes/contacts.js";
 import permissionRoutes from "./routes/permissions.js";
+import adminRoutes from "./routes/admin.js";
 import Campaign from "./models/Campaign.js";
 
 dotenv.config();
@@ -45,6 +46,7 @@ app.use("/api/campaigns", campaignRoutes);
 app.use("/api/donations", donationRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/permissions", permissionRoutes);
+app.use("/api/admin", adminRoutes);
 
 async function connectDB() {
   const primaryUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/donation";

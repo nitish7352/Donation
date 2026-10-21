@@ -204,18 +204,20 @@ export default function DonationHistory({
 
           <div className="flex-row items-center gap-8">
             {isOwner && (
-              <span className="owner-badge-tag">
-                <Crown size={12} className="text-amber inline mr-4" /> Owner
-              </span>
-            )}
-            {donations.length > 0 && onClearHistory && (
-              <button
-                className="btn-clear-history"
-                onClick={onClearHistory}
-                title="Remove all previous transaction history"
-              >
-                <Trash2 size={13} /> Clear History
-              </button>
+              <>
+                <span className="owner-badge-tag">
+                  <ShieldCheck size={12} className="text-emerald inline mr-4" /> Admin View
+                </span>
+                {donations.length > 0 && onClearHistory && (
+                  <button
+                    className="btn-clear-history"
+                    onClick={onClearHistory}
+                    title="Remove all previous transaction history"
+                  >
+                    <Trash2 size={13} /> Clear History
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

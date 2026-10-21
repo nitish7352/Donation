@@ -1,5 +1,6 @@
 import express from "express";
 import Contact from "../models/Contact.js";
+import { requireAdminAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -32,8 +33,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Get all contact messages (Admin view)
-router.get("/", async (req, res) => {
+// Get all contact messages (Admin view - Protected)
+router.get("/", requireAdminAuth, async (req, res) => {
   try {
     const contacts = await Contact.find().sort({ createdAt: -1 });
     res.json(contacts);
@@ -43,8 +44,8 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Update message status (e.g. marked as replied or read)
-router.patch("/:id", async (req, res) => {
+// Update message status (Admin view - Protected)
+router.patch("/:id", requireAdminAuth, async (req, res) => {
   try {
     const { status } = req.body;
     const updated = await Contact.findByIdAndUpdate(

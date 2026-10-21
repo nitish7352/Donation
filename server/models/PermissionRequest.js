@@ -34,7 +34,7 @@ const permissionRequestSchema = new mongoose.Schema(
     },
     ownerEmail: {
       type: String,
-      default: "aky952372@gmail.com"
+      default: "admin@helphands.org"
     }
   },
   { timestamps: true }

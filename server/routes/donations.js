@@ -4,6 +4,7 @@ import Donation from "../models/Donation.js";
 import Campaign from "../models/Campaign.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import { requireAdminAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -189,8 +190,8 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Clear previous history
-router.delete("/clear-all", async (req, res) => {
+// Clear previous history (Admin only)
+router.delete("/clear-all", requireAdminAuth, async (req, res) => {
   try {
     await Donation.deleteMany({});
     res.json({ message: "Previous donation history has been removed." });

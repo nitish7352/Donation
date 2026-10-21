@@ -16,7 +16,8 @@ import {
   Check,
   X,
   ExternalLink,
-  Key
+  Key,
+  LogOut
 } from "lucide-react";
 
 import API from "../config/api";
@@ -28,7 +29,8 @@ export default function AdminPortal({
   isOwner,
   onClearHistory,
   onViewReceipt,
-  onContactUser
+  onContactUser,
+  onLogout
 }) {
   const [activeTab, setActiveTab] = useState("overview"); // "overview" | "donations" | "contacts" | "permissions"
   const [permissionRequests, setPermissionRequests] = useState(() => {
@@ -36,23 +38,31 @@ export default function AdminPortal({
     return saved
       ? JSON.parse(saved)
       : [
-          {
-            _id: "demo-req-1",
-            name: "Rahul Sharma",
-            email: "rahul.sharma@example.com",
-            phone: "+91 98765 12345",
-            reason: "I would like permission to browse campaigns and make a donation.",
-            status: "pending",
-            createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString()
-          }
-        ];
+        {
+          _id: "demo-req-1",
+          name: "Nitish Kumar",
+          email: "[EMAIL_ADDRESS]",
+          phone: "+91 9999999998",
+          reason: "I would like permission to browse campaigns and make a donation.",
+          status: "pending",
+          createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString()
+        }
+      ];
   });
 
-  const OWNER_EMAIL = "aky952372@gmail.com";
+  const getAdminHeaders = () => {
+    const token = sessionStorage.getItem("helphands_admin_token");
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+  };
 
   // Fetch permission requests from server
   useEffect(() => {
-    fetch(`${API}/permissions`)
+    fetch(`${API}/permissions`, {
+      headers: getAdminHeaders()
+    })
       .then((r) => {
         if (!r.ok || !r.headers.get("content-type")?.includes("application/json")) {
           return null;
@@ -65,16 +75,16 @@ export default function AdminPortal({
           localStorage.setItem("helphands_permission_requests", JSON.stringify(data));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleApprove = (req) => {
     const generatedCode = "ACC-" + Math.floor(100000 + Math.random() * 900000);
     fetch(`${API}/permissions/${req._id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAdminHeaders(),
       body: JSON.stringify({ status: "approved" })
-    }).catch(() => {});
+    }).catch(() => { });
 
     setPermissionRequests((prev) => {
       const updated = prev.map((r) =>
@@ -90,9 +100,9 @@ export default function AdminPortal({
   const handleReject = (req) => {
     fetch(`${API}/permissions/${req._id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAdminHeaders(),
       body: JSON.stringify({ status: "rejected" })
-    }).catch(() => {});
+    }).catch(() => { });
 
     setPermissionRequests((prev) => {
       const updated = prev.map((r) =>
@@ -105,9 +115,9 @@ export default function AdminPortal({
 
   const getApprovalMailto = (req) => {
     return `mailto:${req.email}?subject=${encodeURIComponent(
-      "Access Permission Approved for HelpHands Website"
+      "Access Request Approved - HelpHands Platform"
     )}&body=${encodeURIComponent(
-      `Hello ${req.name},\n\nYour permission request to access the HelpHands donation platform has been officially APPROVED by owner (${OWNER_EMAIL})!\n\nYou can now visit the website and enter your email address (${req.email}) or use your approved code: ${req.accessCode || "ACC-APPROVED"}.\n\nWebsite Link: https://donation-nine-livid.vercel.app/\n\nWarm regards,\nOwner (${OWNER_EMAIL})\nHelpHands Foundation`
+      `Hello ${req.name},\n\nYour access request for HelpHands has been approved by the administration team.\n\nYou can now visit the website and use your approved access code: ${req.accessCode || "ACC-APPROVED"}.\n\nWarm regards,\nHelpHands Foundation\ncontact@helphands.org`
     )}`;
   };
 
@@ -123,16 +133,26 @@ export default function AdminPortal({
           <div className="flex-row items-center gap-8 mb-4">
             <span className="eyebrow">Platform Management</span>
             <span className="owner-badge-tag">
-              <Crown size={12} className="text-amber inline mr-4" /> Owner: {OWNER_EMAIL}
+              <ShieldCheck size={12} className="text-emerald inline mr-4" /> Secure Admin Console
             </span>
           </div>
           <h2>Admin & Organizer Portal</h2>
           <p className="muted">
-            Logged in as authorized owner. Review & approve user permission requests, monitor real-time donations, and manage platform records.
+            Authenticated administrator session. Review & approve user access requests, monitor real-time donations, and manage platform records.
           </p>
         </div>
 
         <div className="flex-row items-center gap-10 flex-wrap">
+          {onLogout && (
+            <button
+              className="btn btn-secondary-sm"
+              onClick={onLogout}
+              title="End Administrator Session"
+            >
+              <LogOut size={13} /> Log Out
+            </button>
+          )}
+
           {donations.length > 0 && onClearHistory && (
             <button
               className="btn-clear-history"
@@ -240,13 +260,12 @@ export default function AdminPortal({
                   <div className="contact-meta-row">
                     <strong>{p.name}</strong>
                     <span
-                      className={`status-pill-xs ${
-                        p.status === "approved"
-                          ? "status-pill-success"
-                          : p.status === "rejected"
+                      className={`status-pill-xs ${p.status === "approved"
+                        ? "status-pill-success"
+                        : p.status === "rejected"
                           ? "status-pill-danger"
                           : "status-pill-warning"
-                      }`}
+                        }`}
                     >
                       {p.status.toUpperCase()}
                     </span>
@@ -356,19 +375,18 @@ export default function AdminPortal({
                     </td>
                     <td>
                       <span
-                        className={`status-pill-xs ${
-                          req.status === "approved"
-                            ? "status-pill-success"
-                            : req.status === "rejected"
+                        className={`status-pill-xs ${req.status === "approved"
+                          ? "status-pill-success"
+                          : req.status === "rejected"
                             ? "status-pill-danger"
                             : "status-pill-warning"
-                        }`}
+                          }`}
                       >
                         {req.status === "approved"
                           ? "✓ Approved"
                           : req.status === "rejected"
-                          ? "✗ Rejected"
-                          : "⏳ Pending"}
+                            ? "✗ Rejected"
+                            : "⏳ Pending"}
                       </span>
                       {req.accessCode && (
                         <div className="mt-4">

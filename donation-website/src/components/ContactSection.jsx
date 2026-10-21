@@ -202,7 +202,7 @@ export default function ContactSection({ onContactSubmitted, onOpenContactUserMo
                 <Mail size={18} className="text-emerald" />
                 <div>
                   <strong>Support & Inquiries</strong>
-                  <p>contact@helphands.org | aky952372@gmail.com</p>
+                  <p>aky952372@gmail.com</p>
                 </div>
               </div>
 
