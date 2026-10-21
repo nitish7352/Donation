@@ -115,7 +115,7 @@ export default function ContactSection({ onContactSubmitted, onOpenContactUserMo
                     id="cnt-name"
                     type="text"
                     required
-                    placeholder="e.g. Ramesh Chandra"
+                    placeholder="e.g. Nitish Kumar"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
@@ -127,7 +127,7 @@ export default function ContactSection({ onContactSubmitted, onOpenContactUserMo
                     id="cnt-email"
                     type="email"
                     required
-                    placeholder="e.g. ramesh@example.com"
+                    placeholder="e.g. nitish@example.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />
@@ -140,7 +140,7 @@ export default function ContactSection({ onContactSubmitted, onOpenContactUserMo
                   <input
                     id="cnt-phone"
                     type="tel"
-                    placeholder="+91 98765 43210"
+                    placeholder="+91 7352097919"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   />
@@ -194,7 +194,7 @@ export default function ContactSection({ onContactSubmitted, onOpenContactUserMo
                 <Phone size={18} className="text-emerald" />
                 <div>
                   <strong>Helpline / WhatsApp</strong>
-                  <p>+91 (011) 4920-8800 / +91 98112 34567</p>
+                  <p>+91 (011) 4920-8800 / +91 7352097919</p>
                 </div>
               </div>
 
@@ -202,7 +202,7 @@ export default function ContactSection({ onContactSubmitted, onOpenContactUserMo
                 <Mail size={18} className="text-emerald" />
                 <div>
                   <strong>Support & Inquiries</strong>
-                  <p>contact@helphands.org | receipts@helphands.org</p>
+                  <p>contact@helphands.org | aky952372@gmail.com</p>
                 </div>
               </div>
 
@@ -210,7 +210,7 @@ export default function ContactSection({ onContactSubmitted, onOpenContactUserMo
                 <MapPin size={18} className="text-emerald" />
                 <div>
                   <strong>Registered Office</strong>
-                  <p>Building 4B, DLF Cyber City, Sector 24, Gurugram, HR 122002</p>
+                  <p>Pandit Pur , Chhapra, Bihar 841224</p>
                 </div>
               </div>
 
