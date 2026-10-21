@@ -19,6 +19,8 @@ import {
   Key
 } from "lucide-react";
 
+import API from "../config/api";
+
 export default function AdminPortal({
   campaigns,
   donations,
@@ -46,13 +48,17 @@ export default function AdminPortal({
         ];
   });
 
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
   const OWNER_EMAIL = "aky952372@gmail.com";
 
   // Fetch permission requests from server
   useEffect(() => {
     fetch(`${API}/permissions`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok || !r.headers.get("content-type")?.includes("application/json")) {
+          return null;
+        }
+        return r.json();
+      })
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           setPermissionRequests(data);
@@ -60,7 +66,7 @@ export default function AdminPortal({
         }
       })
       .catch(() => {});
-  }, [API]);
+  }, []);
 
   const handleApprove = (req) => {
     const generatedCode = "ACC-" + Math.floor(100000 + Math.random() * 900000);

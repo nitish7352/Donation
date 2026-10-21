@@ -15,6 +15,7 @@ import {
   Clock,
   Send
 } from "lucide-react";
+import API from "../config/api";
 
 export default function AccessGate({ onGrantAccess }) {
   const [tab, setTab] = useState("request_permission"); // "request_permission" | "check_approval" | "owner_login"
@@ -31,7 +32,6 @@ export default function AccessGate({ onGrantAccess }) {
   const [error, setError] = useState("");
 
   const OWNER_EMAIL = "aky952372@gmail.com";
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   // 1. Submit permission request to owner
   const handleRequestPermission = async (e) => {
@@ -63,7 +63,8 @@ export default function AccessGate({ onGrantAccess }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
-      const data = await res.json();
+      const isJson = res.headers.get("content-type")?.includes("application/json");
+      const data = isJson ? await res.json() : {};
 
       if (res.ok && data.status === "approved") {
         onGrantAccess({
@@ -151,9 +152,10 @@ export default function AccessGate({ onGrantAccess }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: input, accessCode: input.toUpperCase() })
       });
-      const data = await res.json();
+      const isJson = res.headers.get("content-type")?.includes("application/json");
+      const data = isJson ? await res.json() : {};
 
-      if (data.approved) {
+      if (res.ok && data.approved) {
         onGrantAccess({
           authenticated: true,
           isOwner: data.isOwner || false,
