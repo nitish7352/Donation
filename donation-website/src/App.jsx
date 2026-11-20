@@ -54,15 +54,23 @@ export default function App() {
   });
 
   const [donations, setDonations] = useState(() => {
-    const cacheVersion = localStorage.getItem("helphands_cache_v");
-    if (cacheVersion !== "clean_v3") {
-      localStorage.removeItem("helphands_donations");
-      localStorage.setItem("helphands_cache_v", "clean_v3");
-      return [];
-    }
-    const saved = localStorage.getItem("helphands_donations");
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem("helphands_donations");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch { }
+    return initialDonations;
   });
+
+  useEffect(() => {
+    if (Array.isArray(donations) && donations.length > 0) {
+      localStorage.setItem("helphands_donations", JSON.stringify(donations));
+    }
+  }, [donations]);
 
   const [notifications, setNotifications] = useState(() => {
     const saved = localStorage.getItem("helphands_notifications");
@@ -201,13 +209,20 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
-  // URL Route detection for /admin and #admin
+  // URL Route detection for pages & hash changes
   useEffect(() => {
     const handleRouteSync = () => {
-      const path = window.location.pathname;
-      const hash = window.location.hash;
+      const path = (window.location.pathname || "").toLowerCase();
+      const hash = (window.location.hash || "").toLowerCase();
+
       if (path.startsWith("/admin") || hash === "#admin" || hash.startsWith("#/admin")) {
         setPage("admin");
+      } else if (path.startsWith("/history") || hash === "#history" || hash.startsWith("#/history")) {
+        setPage("history");
+      } else if (path.startsWith("/campaigns") || hash === "#campaigns" || hash.startsWith("#/campaigns")) {
+        setPage("campaigns");
+      } else if (path.startsWith("/contact") || hash === "#contact" || hash.startsWith("#/contact")) {
+        setPage("contact");
       }
     };
     handleRouteSync();
