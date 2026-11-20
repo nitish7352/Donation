@@ -1610,7 +1610,7 @@ export default function App() {
                 <input
                   type="text"
                   required={!form.isAnonymous}
-                  placeholder="e.g. Priyanshu Kashyap"
+                  placeholder="e.g. Adarsh Yadav"
                   value={form.donorName}
                   onChange={(e) => setForm({ ...form, donorName: e.target.value })}
                 />
@@ -1631,7 +1631,7 @@ export default function App() {
                   <label className="field-label">Phone / WhatsApp</label>
                   <input
                     type="tel"
-                    placeholder="+91 98765 43210"
+                    placeholder="+91 7352097919"
                     value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   />
@@ -1735,8 +1735,8 @@ export default function App() {
 
           <div className="footer-col-contact">
             <h5>Helpline & Desk</h5>
-            <p><Phone size={14} className="inline mr-6 text-emerald" /> +91 7352097919</p>
-            <p><Mail size={14} className="inline mr-6 text-emerald" /> aky952372@gmail.com</p>
+            <p><Phone size={14} className="inline mr-6 text-emerald" /> +91 (011) 4920-8800 / +91 7352097919</p>
+            <p><Mail size={14} className="inline mr-6 text-emerald" /> contact@helphands.org | aky952372@gmail.com</p>
             <p className="footer-sub-text">
               Pandit Pur, Chhapra(Saran), Bihar, 841224
             </p>

@@ -22,6 +22,8 @@ import {
 
 import API from "../config/api";
 
+const OWNER_EMAIL = "aky952372@gmail.com";
+
 export default function AdminPortal({
   campaigns,
   donations,
