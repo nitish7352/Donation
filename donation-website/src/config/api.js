@@ -63,4 +63,25 @@ export const API_BASE_URL = getApiBaseUrl();
 // Full /api endpoint prefix
 export const API = API_BASE_URL ? `${API_BASE_URL}/api` : "/api";
 
+export function hasBackendConfigured() {
+  const envUrl = (
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    ""
+  ).trim();
+
+  // In local development: backend is on localhost:5000
+  if (isLocalhost()) return true;
+
+  // In production (Vercel): only call if an external backend origin is set
+  if (envUrl) {
+    const isLoopback =
+      envUrl.includes("localhost") ||
+      envUrl.includes("127.0.0.1") ||
+      envUrl.includes("0.0.0.0");
+    return !isLoopback;
+  }
+  return false;
+}
+
 export default API;

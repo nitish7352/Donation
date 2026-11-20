@@ -44,7 +44,7 @@ import AdminLogin from "./components/AdminLogin";
 import Sidebar from "./components/Sidebar";
 import RequestAccessModal from "./components/RequestAccessModal";
 import Toast from "./components/Toast";
-import API from "./config/api";
+import API, { hasBackendConfigured } from "./config/api";
 
 export default function App() {
   // Data states with localStorage persistence & initial fallbacks
@@ -147,14 +147,23 @@ export default function App() {
     };
   }, [isNotifOpen]);
 
-  // Try fetching backend data if server is up
+  // Fetch backend data with fast timeout & offline fast-path
   async function loadDataFromApi() {
+    if (!hasBackendConfigured()) {
+      return; // Standalone fast-path: zero network latency on page load
+    }
+
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
       const [cRes, dRes] = await Promise.allSettled([
-        fetch(`${API}/campaigns`),
-        fetch(`${API}/donations`),
-        fetch(`${API}/contacts`)
+        fetch(`${API}/campaigns`, { signal: controller.signal }),
+        fetch(`${API}/donations`, { signal: controller.signal }),
+        fetch(`${API}/contacts`, { signal: controller.signal })
       ]);
+
+      clearTimeout(timeoutId);
 
       if (cRes.status === "fulfilled" && cRes.value.ok) {
         const isJson = cRes.value.headers.get("content-type")?.includes("application/json");
@@ -186,7 +195,7 @@ export default function App() {
         }
       }
     } catch {
-      // Backend gracefully falls back to local data
+      // Backend gracefully falls back to instant cached data
     }
   }
 
@@ -988,9 +997,13 @@ export default function App() {
             <div className="hero-visual">
               <div className="hero-image-card">
                 <img
-                  src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1000&auto=format&fit=crop&q=80"
+                  src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=720&auto=format&fit=crop&q=75"
                   alt="Children learning in a classroom"
                   className="hero-main-img"
+                  fetchPriority="high"
+                  decoding="async"
+                  width="600"
+                  height="450"
                 />
                 {/* Floating Social Proof Card */}
                 <div className="floating-stat-overlay">
@@ -1108,9 +1121,11 @@ export default function App() {
 
             <div className="spotlight-img-col">
               <img
-                src="https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=900&auto=format&fit=crop&q=80"
+                src="https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=600&auto=format&fit=crop&q=75"
                 alt="Volunteers providing emergency food relief kits"
                 className="spotlight-img"
+                loading="lazy"
+                decoding="async"
               />
               <div className="spotlight-stat-float">
                 <div>
@@ -1126,9 +1141,11 @@ export default function App() {
           <section className="spotlight-card-banner">
             <div className="spotlight-img-col">
               <img
-                src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=900&auto=format&fit=crop&q=80"
+                src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=600&auto=format&fit=crop&q=75"
                 alt="Underprivileged girl marriage assistance ceremony"
                 className="spotlight-img"
+                loading="lazy"
+                decoding="async"
               />
               <div className="spotlight-stat-float">
                 <div>
@@ -1220,7 +1237,13 @@ export default function App() {
                 return (
                   <article key={camp._id} className="campaign-card-premium">
                     <div className="card-thumb-wrap">
-                      <img src={camp.image} alt={camp.title} className="card-img" />
+                      <img
+                        src={camp.image}
+                        alt={camp.title}
+                        className="card-img"
+                        loading="lazy"
+                        decoding="async"
+                      />
                       <span className="card-category-tag">{camp.category}</span>
                       {camp.daysLeft && (
                         <span className="card-days-tag">
@@ -1406,7 +1429,13 @@ export default function App() {
               return (
                 <article key={camp._id} className="campaign-card-premium">
                   <div className="card-thumb-wrap">
-                    <img src={camp.image} alt={camp.title} className="card-img" />
+                    <img
+                      src={camp.image}
+                      alt={camp.title}
+                      className="card-img"
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <span className="card-category-tag">{camp.category}</span>
                     {camp.daysLeft && (
                       <span className="card-days-tag">
@@ -1525,6 +1554,8 @@ export default function App() {
                 src={selectedCampaign.image}
                 alt={selectedCampaign.title}
                 className="summary-img"
+                loading="lazy"
+                decoding="async"
               />
               <div className="summary-info">
                 <span className="card-category-tag">{selectedCampaign.category}</span>
