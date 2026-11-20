@@ -13,7 +13,10 @@ import {
   Download,
   Users,
   Trash2,
-  Crown
+  Crown,
+  Phone,
+  MessageSquare,
+  ExternalLink
 } from "lucide-react";
 
 export default function DonationHistory({
@@ -80,6 +83,21 @@ export default function DonationHistory({
     } catch {
       return "Recently";
     }
+  };
+
+  const getCleanPhone = (phone) => {
+    if (!phone) return "";
+    return phone.replace(/[^0-9+]/g, "");
+  };
+
+  const getWhatsAppUrl = (phone, name = "Supporter", amount) => {
+    if (!phone) return "";
+    const digits = phone.replace(/[^0-9]/g, "");
+    const formatted = digits.length === 10 ? `91${digits}` : digits;
+    const msg = amount
+      ? `Hello ${name}, thank you for your generous contribution of ₹${Number(amount).toLocaleString("en-IN")} to HelpHands Foundation! 🙏`
+      : `Hello ${name}, warm greetings from HelpHands Foundation!`;
+    return `https://wa.me/${formatted}?text=${encodeURIComponent(msg)}`;
   };
 
   return (
@@ -261,7 +279,40 @@ export default function DonationHistory({
                               <strong>{item.donorName || "Anonymous"}</strong>
                               {isLarge && <span className="top-donor-badge">★ Top Supporter</span>}
                             </div>
-                            {item.email && <span className="donor-email">{item.email}</span>}
+                            {item.email && (
+                              <div>
+                                <a
+                                  href={`mailto:${item.email}?subject=${encodeURIComponent("Thank you from HelpHands Foundation")}&body=${encodeURIComponent(`Dear ${item.donorName || "Supporter"},\n\nThank you for your generous contribution of ₹${Number(item.amount || 0).toLocaleString("en-IN")} to HelpHands Foundation.\n\nWarm regards,\nHelpHands Foundation`)}`}
+                                  className="donor-tap-link email-tap-link"
+                                  title="Tap to send email"
+                                >
+                                  <Mail size={12} className="inline mr-4" />
+                                  {item.email}
+                                </a>
+                              </div>
+                            )}
+                            {item.phone && (
+                              <div className="donor-phone-actions-row">
+                                <a
+                                  href={`tel:${getCleanPhone(item.phone)}`}
+                                  className="donor-tap-link phone-tap-link"
+                                  title="Tap to call phone"
+                                >
+                                  <Phone size={12} className="inline mr-4" />
+                                  {item.phone}
+                                </a>
+                                <a
+                                  href={getWhatsAppUrl(item.phone, item.donorName, item.amount)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="donor-tap-link whatsapp-tap-link"
+                                  title="Tap to chat on WhatsApp"
+                                >
+                                  <MessageSquare size={12} className="inline mr-4" />
+                                  WhatsApp
+                                </a>
+                              </div>
+                            )}
                             {item.message && (
                               <p className="donor-note-snippet">
                                 💬 "{item.message}"
@@ -318,6 +369,18 @@ export default function DonationHistory({
                           >
                             <FileText size={14} /> Receipt
                           </button>
+
+                          {item.phone && (
+                            <a
+                              href={getWhatsAppUrl(item.phone, item.donorName, item.amount)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-action-whatsapp"
+                              title="Chat with donor on WhatsApp"
+                            >
+                              <MessageSquare size={14} /> WhatsApp
+                            </a>
+                          )}
 
                           <button
                             className="btn-action-contact"

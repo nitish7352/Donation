@@ -3786,3 +3786,215 @@ button {
     display: none !important;
   }
 }
+
+/* ==========================================================================
+   Interactive Tap-to-Contact Elements (Phone, WhatsApp, Email)
+   ========================================================================== */
+
+.donor-tap-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 3px 8px;
+  margin-top: 3px;
+  font-weight: 500;
+  transition: all 0.18s ease-in-out;
+  cursor: pointer;
+}
+
+.donor-tap-link.email-tap-link {
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+.donor-tap-link.email-tap-link:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  text-decoration: underline;
+}
+
+.donor-tap-link.phone-tap-link {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+.donor-tap-link.phone-tap-link:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  text-decoration: underline;
+}
+
+.donor-tap-link.whatsapp-tap-link {
+  color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  font-weight: 600;
+}
+.donor-tap-link.whatsapp-tap-link:hover {
+  background: #25d366;
+  color: #ffffff;
+  border-color: #25d366;
+  text-decoration: none;
+}
+
+.donor-phone-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.btn-action-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  background: #25d366;
+  color: #ffffff !important;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.18s ease;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(37, 211, 102, 0.25);
+}
+.btn-action-whatsapp:hover {
+  background: #128c7e;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(18, 140, 126, 0.35);
+}
+
+.tap-contact-btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tap-contact-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.tap-contact-badge.phone-badge {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+.tap-contact-badge.phone-badge:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+.tap-contact-badge.landline-badge {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+.tap-contact-badge.landline-badge:hover {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+.tap-contact-badge.whatsapp-badge {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+.tap-contact-badge.whatsapp-badge:hover {
+  background: #25d366;
+  color: #ffffff;
+  border-color: #25d366;
+  box-shadow: 0 3px 8px rgba(37, 211, 102, 0.3);
+}
+
+.tap-contact-badge.email-badge {
+  background: #fdf4ff;
+  color: #86198f;
+  border: 1px solid #f0abfc;
+}
+.tap-contact-badge.email-badge:hover {
+  background: #a21caf;
+  color: #ffffff;
+  border-color: #a21caf;
+}
+
+.footer-contact-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.footer-tap-link {
+  color: rgba(255, 255, 255, 0.88);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.footer-tap-link:hover {
+  color: #34d399;
+  text-decoration: underline;
+}
+
+.footer-whatsapp-highlight {
+  color: #34d399 !important;
+  font-weight: 600;
+}
+.footer-whatsapp-highlight:hover {
+  color: #6ee7b7 !important;
+}
+
+.btn-whatsapp-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  text-decoration: none;
+  transition: all 0.18s ease;
+}
+.btn-whatsapp-outline:hover {
+  background: #25d366;
+  color: #ffffff;
+  border-color: #25d366;
+}
+
+.btn-phone-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  text-decoration: none;
+  transition: all 0.18s ease;
+}
+.btn-phone-outline:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}

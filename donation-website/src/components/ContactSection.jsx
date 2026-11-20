@@ -193,16 +193,64 @@ export default function ContactSection({ onContactSubmitted, onOpenContactUserMo
               <div className="contact-detail-item">
                 <Phone size={18} className="text-emerald" />
                 <div>
-                  <strong>Helpline / WhatsApp</strong>
-                  <p>+91 (011) 4920-8800 / +91 7352097919</p>
+                  <strong>Helpline & Calling Desk</strong>
+                  <div className="tap-contact-btn-group">
+                    <a
+                      href="tel:+917352097919"
+                      className="tap-contact-badge phone-badge"
+                      title="Tap to call +91 7352097919"
+                    >
+                      <Phone size={13} /> +91 7352097919
+                    </a>
+                    <a
+                      href="tel:+911149208800"
+                      className="tap-contact-badge landline-badge"
+                      title="Tap to call +91 (011) 4920-8800"
+                    >
+                      <Phone size={13} /> +91 (011) 4920-8800
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div className="contact-detail-item">
+                <MessageSquare size={18} className="text-emerald" />
+                <div>
+                  <strong>WhatsApp Instant Support</strong>
+                  <div className="tap-contact-btn-group">
+                    <a
+                      href="https://wa.me/917352097919?text=Hello%20HelpHands%20Foundation,%20I%20have%20an%20inquiry%20regarding%20donations."
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tap-contact-badge whatsapp-badge"
+                      title="Tap to chat on WhatsApp"
+                    >
+                      <MessageSquare size={13} /> Chat on WhatsApp (+91 7352097919)
+                    </a>
+                  </div>
                 </div>
               </div>
 
               <div className="contact-detail-item">
                 <Mail size={18} className="text-emerald" />
                 <div>
-                  <strong>Support & Inquiries</strong>
-                  <p>aky952372@gmail.com</p>
+                  <strong>Official Email Helpdesk</strong>
+                  <div className="tap-contact-btn-group">
+                    <a
+                      href="mailto:aky952372@gmail.com?subject=HelpHands%20Platform%20Inquiry"
+                      className="tap-contact-badge email-badge"
+                      title="Tap to email aky952372@gmail.com"
+                    >
+                      <Mail size={13} /> aky952372@gmail.com
+                    </a>
+                    <a
+                      href="mailto:contact@helphands.org?subject=HelpHands%20General%20Inquiry"
+                      className="tap-contact-badge email-badge"
+                      title="Tap to email contact@helphands.org"
+                    >
+                      <Mail size={13} /> contact@helphands.org
+                    </a>
+                  </div>
                 </div>
               </div>
 

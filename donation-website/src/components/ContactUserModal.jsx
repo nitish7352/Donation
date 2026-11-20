@@ -1,11 +1,19 @@
 import React, { useState } from "react";
-import { Mail, Send, X, User, ExternalLink, CheckCircle2, MessageSquare } from "lucide-react";
+import { Mail, Send, X, User, ExternalLink, CheckCircle2, MessageSquare, Phone } from "lucide-react";
 
 export default function ContactUserModal({ userTarget, onClose, onMessageSent }) {
   if (!userTarget) return null;
 
   const defaultEmail = userTarget.email || "";
+  const defaultPhone = userTarget.phone || "";
   const defaultName = userTarget.donorName || userTarget.name || "Valued User";
+
+  const getCleanPhone = (phone) => (phone ? phone.replace(/[^0-9+]/g, "") : "");
+  const getWhatsAppDigits = (phone) => {
+    if (!phone) return "";
+    const digits = phone.replace(/[^0-9]/g, "");
+    return digits.length === 10 ? `91${digits}` : digits;
+  };
 
   const templates = [
     {
@@ -138,6 +146,39 @@ export default function ContactUserModal({ userTarget, onClose, onMessageSent })
               </div>
             </div>
 
+            {defaultPhone && (
+              <div className="form-group">
+                <label>Recipient Phone / WhatsApp</label>
+                <div className="input-with-icon">
+                  <Phone size={16} className="field-icon" />
+                  <input
+                    type="text"
+                    value={defaultPhone}
+                    disabled
+                    className="input-disabled"
+                  />
+                </div>
+                <div className="flex-row gap-8 mt-6">
+                  <a
+                    href={`https://wa.me/${getWhatsAppDigits(defaultPhone)}?text=${encodeURIComponent(`Hello ${defaultName},\n\n${message}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-whatsapp-outline"
+                    title="Open WhatsApp chat"
+                  >
+                    <MessageSquare size={14} /> Open in WhatsApp
+                  </a>
+                  <a
+                    href={`tel:${getCleanPhone(defaultPhone)}`}
+                    className="btn-phone-outline"
+                    title="Call phone number"
+                  >
+                    <Phone size={14} /> Call {defaultPhone}
+                  </a>
+                </div>
+              </div>
+            )}
+
             <div className="form-group">
               <label>Subject</label>
               <input
@@ -160,6 +201,17 @@ export default function ContactUserModal({ userTarget, onClose, onMessageSent })
             </div>
 
             <div className="modal-footer-actions">
+              {defaultPhone && (
+                <a
+                  href={`https://wa.me/${getWhatsAppDigits(defaultPhone)}?text=${encodeURIComponent(`Hello ${defaultName},\n\n${message}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-action-whatsapp"
+                  title="Chat directly on WhatsApp"
+                >
+                  <MessageSquare size={16} /> WhatsApp
+                </a>
+              )}
               <a
                 href={mailtoLink}
                 target="_blank"

@@ -22,7 +22,8 @@ import {
   Menu,
   Crown,
   Key,
-  Gift
+  Gift,
+  MessageSquare
 } from "lucide-react";
 import "./index.css";
 
@@ -277,6 +278,7 @@ export default function App() {
       _id: "sim-" + Date.now(),
       donorName: randomDonor,
       email: `${randomDonor.toLowerCase().replace(" ", ".")}@example.com`,
+      phone: "+91 " + Math.floor(7000000000 + Math.random() * 2999999999),
       amount: randomAmount,
       campaignTitle: randomCampaign.title,
       campaignId: randomCampaign._id,
@@ -1735,11 +1737,35 @@ export default function App() {
 
           <div className="footer-col-contact">
             <h5>Helpline & Desk</h5>
-            <p><Phone size={14} className="inline mr-6 text-emerald" /> +91 (011) 4920-8800 / +91 7352097919</p>
-            <p><Mail size={14} className="inline mr-6 text-emerald" /> contact@helphands.org | aky952372@gmail.com</p>
-            <p className="footer-sub-text">
-              Pandit Pur, Chhapra(Saran), Bihar, 841224
-            </p>
+            <div className="footer-contact-links-list">
+              <p>
+                <Phone size={14} className="inline mr-6 text-emerald" />
+                <a href="tel:+917352097919" className="footer-tap-link" title="Tap to call helpline">+91 7352097919</a>
+                {" / "}
+                <a href="tel:+911149208800" className="footer-tap-link" title="Tap to call office landline">+91 (011) 4920-8800</a>
+              </p>
+              <p>
+                <MessageSquare size={14} className="inline mr-6 text-emerald" />
+                <a
+                  href="https://wa.me/917352097919?text=Hello%20HelpHands%20Foundation"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer-tap-link footer-whatsapp-highlight"
+                  title="Tap to chat on WhatsApp"
+                >
+                  WhatsApp: +91 7352097919
+                </a>
+              </p>
+              <p>
+                <Mail size={14} className="inline mr-6 text-emerald" />
+                <a href="mailto:contact@helphands.org" className="footer-tap-link" title="Tap to send email">contact@helphands.org</a>
+                {" • "}
+                <a href="mailto:aky952372@gmail.com" className="footer-tap-link" title="Tap to send email">aky952372@gmail.com</a>
+              </p>
+              <p className="footer-sub-text">
+                Pandit Pur, Chhapra(Saran), Bihar, 841224
+              </p>
+            </div>
           </div>
         </div>
 

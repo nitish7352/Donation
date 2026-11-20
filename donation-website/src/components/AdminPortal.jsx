@@ -17,12 +17,21 @@ import {
   X,
   ExternalLink,
   Key,
-  LogOut
+  LogOut,
+  Phone,
+  MessageSquare
 } from "lucide-react";
 
 import API from "../config/api";
 
 const OWNER_EMAIL = "aky952372@gmail.com";
+
+const getCleanPhone = (phone) => (phone ? phone.replace(/[^0-9+]/g, "") : "");
+const getWhatsAppDigits = (phone) => {
+  if (!phone) return "";
+  const digits = phone.replace(/[^0-9]/g, "");
+  return digits.length === 10 ? `91${digits}` : digits;
+};
 
 export default function AdminPortal({
   campaigns,
@@ -366,8 +375,38 @@ export default function AdminPortal({
                       <strong>{req.name}</strong>
                     </td>
                     <td>
-                      <div>{req.email}</div>
-                      {req.phone && <div className="muted-xs">{req.phone}</div>}
+                      <div>
+                        <a
+                          href={`mailto:${req.email}?subject=${encodeURIComponent("HelpHands Access Request")}&body=${encodeURIComponent(`Hello ${req.name},\n\nRegarding your access request on HelpHands platform...`)}`}
+                          className="donor-tap-link email-tap-link"
+                          title="Tap to send email"
+                        >
+                          <Mail size={12} className="inline mr-4" />
+                          {req.email}
+                        </a>
+                      </div>
+                      {req.phone && (
+                        <div className="flex-row gap-6 mt-4">
+                          <a
+                            href={`tel:${getCleanPhone(req.phone)}`}
+                            className="donor-tap-link phone-tap-link"
+                            title="Tap to call"
+                          >
+                            <Phone size={11} className="inline mr-4" />
+                            {req.phone}
+                          </a>
+                          <a
+                            href={`https://wa.me/${getWhatsAppDigits(req.phone)}?text=${encodeURIComponent(`Hello ${req.name}, regarding your access request for HelpHands platform:`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="donor-tap-link whatsapp-tap-link"
+                            title="Tap to chat on WhatsApp"
+                          >
+                            <MessageSquare size={11} className="inline mr-4" />
+                            WhatsApp
+                          </a>
+                        </div>
+                      )}
                     </td>
                     <td>
                       <p className="donor-note-snippet">{req.reason || "General browsing and donation"}</p>
@@ -467,7 +506,31 @@ export default function AdminPortal({
                 {donations.map((d) => (
                   <tr key={d._id}>
                     <td><strong>{d.donorName}</strong></td>
-                    <td className="muted-sm">{d.email || "—"}</td>
+                    <td>
+                      <div>
+                        {d.email ? (
+                          <a href={`mailto:${d.email}?subject=${encodeURIComponent("HelpHands Donation Receipt & Appreciation")}`} className="donor-tap-link email-tap-link" title="Tap to email donor">
+                            <Mail size={12} className="inline mr-4" /> {d.email}
+                          </a>
+                        ) : "—"}
+                      </div>
+                      {d.phone && (
+                        <div className="flex-row gap-6 mt-4">
+                          <a href={`tel:${getCleanPhone(d.phone)}`} className="donor-tap-link phone-tap-link" title="Tap to call">
+                            <Phone size={11} className="inline mr-4" /> {d.phone}
+                          </a>
+                          <a
+                            href={`https://wa.me/${getWhatsAppDigits(d.phone)}?text=${encodeURIComponent(`Hello ${d.donorName || "Supporter"}, thank you for donating to HelpHands Foundation!`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="donor-tap-link whatsapp-tap-link"
+                            title="Chat on WhatsApp"
+                          >
+                            <MessageSquare size={11} className="inline mr-4" /> WA
+                          </a>
+                        </div>
+                      )}
+                    </td>
                     <td>{d.campaignTitle || d.campaign?.title || "Campaign"}</td>
                     <td><strong className="text-emerald">+₹{Number(d.amount).toLocaleString("en-IN")}</strong></td>
                     <td className="muted-xs">{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : "Recent"}</td>
@@ -513,7 +576,38 @@ export default function AdminPortal({
                     <div className="donor-avatar">{cnt.name?.[0] || "U"}</div>
                     <div>
                       <strong>{cnt.name}</strong>
-                      <span className="user-inquiry-email">({cnt.email} {cnt.phone ? `• ${cnt.phone}` : ""})</span>
+                      <div className="flex-row items-center gap-8 mt-4">
+                        <a
+                          href={`mailto:${cnt.email}?subject=${encodeURIComponent(`Re: ${cnt.subject || "Your Inquiry to HelpHands"}`)}`}
+                          className="donor-tap-link email-tap-link"
+                          title="Tap to email user"
+                        >
+                          <Mail size={12} className="inline mr-4" />
+                          {cnt.email}
+                        </a>
+                        {cnt.phone && (
+                          <>
+                            <a
+                              href={`tel:${getCleanPhone(cnt.phone)}`}
+                              className="donor-tap-link phone-tap-link"
+                              title="Tap to call phone"
+                            >
+                              <Phone size={12} className="inline mr-4" />
+                              {cnt.phone}
+                            </a>
+                            <a
+                              href={`https://wa.me/${getWhatsAppDigits(cnt.phone)}?text=${encodeURIComponent(`Hello ${cnt.name}, regarding your message to HelpHands: "${cnt.subject}"`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="donor-tap-link whatsapp-tap-link"
+                              title="Tap to chat on WhatsApp"
+                            >
+                              <MessageSquare size={12} className="inline mr-4" />
+                              WhatsApp
+                            </a>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex-row items-center gap-8">
