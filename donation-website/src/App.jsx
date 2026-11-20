@@ -99,6 +99,7 @@ export default function App() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
     return sessionStorage.getItem("helphands_is_admin") === "true";
   });
+  const isOwner = isAdminAuthenticated;
 
   // Donation Form state
   const [form, setForm] = useState({
@@ -218,6 +219,19 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
+  // Navigation helper with automatic smooth scrolling & URL hash synchronization
+  function navigateTo(targetPage) {
+    setPage(targetPage);
+    window.location.hash = `#${targetPage}`;
+    setIsMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // Auto-scroll to top whenever navigating to a new page
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
+
   // URL Route detection for pages & hash changes
   useEffect(() => {
     const handleRouteSync = () => {
@@ -232,6 +246,8 @@ export default function App() {
         setPage("campaigns");
       } else if (path.startsWith("/contact") || hash === "#contact" || hash.startsWith("#/contact")) {
         setPage("contact");
+      } else if (path === "/" && (hash === "" || hash === "#home")) {
+        setPage("home");
       }
     };
     handleRouteSync();
@@ -741,11 +757,11 @@ export default function App() {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         currentPage={page}
-        onNavigate={(p) => setPage(p)}
+        onNavigate={(p) => navigateTo(p)}
         onRequestAccessClick={() => setIsRequestAccessOpen(true)}
         onSelectCategory={(cat) => {
           setCategoryFilter(cat);
-          setPage("campaigns");
+          navigateTo("campaigns");
         }}
       />
 
@@ -803,7 +819,7 @@ export default function App() {
               className="brand-logo"
               onClick={(e) => {
                 e.preventDefault();
-                setPage("home");
+                navigateTo("home");
               }}
             >
               <div className="logo-heart-wrap">
@@ -820,26 +836,26 @@ export default function App() {
           <nav className="nav-menu">
             <button
               className={`nav-link ${page === "home" ? "active" : ""}`}
-              onClick={() => setPage("home")}
+              onClick={() => navigateTo("home")}
             >
               Home
             </button>
             <button
               className={`nav-link ${page === "campaigns" ? "active" : ""}`}
-              onClick={() => setPage("campaigns")}
+              onClick={() => navigateTo("campaigns")}
             >
               Causes & Campaigns
             </button>
             <button
               className={`nav-link nav-link-special ${page === "history" ? "active" : ""}`}
-              onClick={() => setPage("history")}
+              onClick={() => navigateTo("history")}
             >
               <span className="live-dot" />
               Received History
             </button>
             <button
               className={`nav-link ${page === "contact" ? "active" : ""}`}
-              onClick={() => setPage("contact")}
+              onClick={() => navigateTo("contact")}
             >
               Contact Us
             </button>
@@ -874,7 +890,7 @@ export default function App() {
                     prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n))
                   );
                   if (notif.type === "money") {
-                    setPage("history");
+                    navigateTo("history");
                     setIsNotifOpen(false);
                   }
                 }}
@@ -907,25 +923,25 @@ export default function App() {
           <div className="mobile-nav-drawer">
             <button
               className={`mobile-nav-link ${page === "home" ? "active" : ""}`}
-              onClick={() => { setPage("home"); setIsMobileMenuOpen(false); }}
+              onClick={() => navigateTo("home")}
             >
               Home
             </button>
             <button
               className={`mobile-nav-link ${page === "campaigns" ? "active" : ""}`}
-              onClick={() => { setPage("campaigns"); setIsMobileMenuOpen(false); }}
+              onClick={() => navigateTo("campaigns")}
             >
               Causes & Campaigns
             </button>
             <button
               className={`mobile-nav-link ${page === "history" ? "active" : ""}`}
-              onClick={() => { setPage("history"); setIsMobileMenuOpen(false); }}
+              onClick={() => navigateTo("history")}
             >
               <span className="live-dot" /> Received History
             </button>
             <button
               className={`mobile-nav-link ${page === "contact" ? "active" : ""}`}
-              onClick={() => { setPage("contact"); setIsMobileMenuOpen(false); }}
+              onClick={() => navigateTo("contact")}
             >
               Contact Us & Helpdesk
             </button>
@@ -965,13 +981,13 @@ export default function App() {
               <div className="hero-cta-group">
                 <button
                   className="btn btn-primary btn-lg"
-                  onClick={() => setPage("campaigns")}
+                  onClick={() => navigateTo("campaigns")}
                 >
                   Explore Campaigns <ArrowRight size={18} />
                 </button>
                 <button
                   className="btn btn-outline btn-lg"
-                  onClick={() => setPage("history")}
+                  onClick={() => navigateTo("history")}
                 >
                   <span className="live-dot" /> View Received History
                 </button>
@@ -1111,7 +1127,7 @@ export default function App() {
                   className="btn btn-outline"
                   onClick={() => {
                     setCategoryFilter("Food");
-                    setPage("campaigns");
+                    navigateTo("campaigns");
                   }}
                 >
                   View Food Fundraisers →
@@ -1203,7 +1219,7 @@ export default function App() {
                   className="btn btn-outline"
                   onClick={() => {
                     setCategoryFilter("Social Welfare");
-                    setPage("campaigns");
+                    navigateTo("campaigns");
                   }}
                 >
                   Learn About Kanyadaan →
@@ -1221,7 +1237,7 @@ export default function App() {
               </div>
               <button
                 className="btn btn-secondary-sm"
-                onClick={() => setPage("campaigns")}
+                onClick={() => navigateTo("campaigns")}
               >
                 View All Causes ({campaigns.length}) →
               </button>
@@ -1300,7 +1316,7 @@ export default function App() {
               <div className="flex-row gap-12 mt-15">
                 <button
                   className="btn btn-light-glow"
-                  onClick={() => setPage("history")}
+                  onClick={() => navigateTo("history")}
                 >
                   Open Money Received History ({donations.length})
                 </button>
@@ -1542,7 +1558,7 @@ export default function App() {
         <main className="container section-block">
           <button
             className="btn btn-secondary-sm mb-20"
-            onClick={() => setPage("campaigns")}
+            onClick={() => navigateTo("campaigns")}
           >
             ← Back to Campaigns
           </button>
@@ -1763,10 +1779,10 @@ export default function App() {
           <div className="footer-col-links">
             <h5>Navigation</h5>
             <ul>
-              <li><button onClick={() => setPage("home")}>Home</button></li>
-              <li><button onClick={() => setPage("campaigns")}>Active Causes</button></li>
-              <li><button onClick={() => setPage("history")}>Money Received History</button></li>
-              <li><button onClick={() => setPage("contact")}>Contact & Helpdesk</button></li>
+              <li><button onClick={() => navigateTo("home")}>Home</button></li>
+              <li><button onClick={() => navigateTo("campaigns")}>Active Causes</button></li>
+              <li><button onClick={() => navigateTo("history")}>Money Received History</button></li>
+              <li><button onClick={() => navigateTo("contact")}>Contact & Helpdesk</button></li>
               <li><button onClick={() => setIsRequestAccessOpen(true)}>Request Access</button></li>
             </ul>
           </div>
@@ -1774,10 +1790,10 @@ export default function App() {
           <div className="footer-col-links">
             <h5>Causes</h5>
             <ul>
-              <li><button onClick={() => { setCategoryFilter("Education"); setPage("campaigns"); }}>Child Education</button></li>
-              <li><button onClick={() => { setCategoryFilter("Healthcare"); setPage("campaigns"); }}>Emergency Medical Care</button></li>
-              <li><button onClick={() => { setCategoryFilter("Food"); setPage("campaigns"); }}>Hunger Relief Rations</button></li>
-              <li><button onClick={() => { setCategoryFilter("Social Welfare"); setPage("campaigns"); }}>Poor Girl Marriage Aid</button></li>
+              <li><button onClick={() => { setCategoryFilter("Education"); navigateTo("campaigns"); }}>Child Education</button></li>
+              <li><button onClick={() => { setCategoryFilter("Healthcare"); navigateTo("campaigns"); }}>Emergency Medical Care</button></li>
+              <li><button onClick={() => { setCategoryFilter("Food"); navigateTo("campaigns"); }}>Hunger Relief Rations</button></li>
+              <li><button onClick={() => { setCategoryFilter("Social Welfare"); navigateTo("campaigns"); }}>Poor Girl Marriage Aid</button></li>
             </ul>
           </div>
 
